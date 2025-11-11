@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Sol Browser</title>
+    <style>
+        /* Basic reset */
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f0f2f5;
+        }
+
+        /* Our main app layout now uses 'row' to put things side-by-side
+        */
+        #app-container {
+            display: flex;
+            flex-direction: row; /* This is the key change! */
+            height: 100vh;
+        }
+
+        /* This is our new sidebar, replacing the old #nav-bar
+        */
+        #sidebar {
+            display: flex;
+            flex-direction: column; /* Stack controls vertically */
+            align-items: center; /* Center the buttons */
+            width: 280px; /* Give it a fixed width like Arc */
+            padding: 20px 12px;
+            background-color: #e9ebee; /* A nice sidebar color */
+            border-right: 1px solid #ddd;
+            box-sizing: border-box; /* Include padding in the width */
+        }
+
+        /* We updated the styles for the controls to fit the new sidebar
+        */
+        #nav-buttons {
+            display: flex;
+            justify-content: center; /* Center buttons horizontally */
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        #nav-buttons button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 18px;
+            padding: 8px 12px;
+            border-radius: 5px;
+        }
+        #nav-buttons button:hover {
+            background-color: #ddd;
+        }
+        #nav-buttons button:disabled {
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        /* The URL bar now fits vertically in the sidebar
+        */
+        #url-bar {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 8px; /* Less rounded for a "block" feel */
+            margin-bottom: 15px;
+            box-sizing: border-box; /* Important! */
+            outline: none;
+        }
+        #url-bar:focus {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+        }
+
+        /* The webview container just takes up the remaining space
+        */
+        #webview-container {
+            flex: 1; /* Take up all remaining space */
+            position: relative;
+        }
+
+        webview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+
+        <div id="sidebar">
+            <input type="text" id="url-bar" placeholder="https://">
+            <div id="nav-buttons">
+                <button id="back-btn" disabled>&larr;</button>
+                <button id="forward-btn" disabled>&rarr;</button>
+                <button id="reload-btn">&#x21bb;</button>
+            </div>
+            </div>
+
+        <div id="webview-container">
+            <webview id="browser-view" src="https://www.google.com" autosize="on"></webview>
+        </div>
+
+    </div>
+
+    <script src="./renderer.js"></script>
+
+</body>
+</html>
