@@ -2,6 +2,7 @@
 
 // Import the two main parts of Electron
 const { app, BrowserWindow } = require('electron');
+const path = require('path');
 
 // A function that creates the actual browser window
 function createWindow() {
@@ -9,6 +10,7 @@ function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    icon: path.join(__dirname, 'assets', 'Sol logo.png'), // Set the window icon
     webPreferences: {
       nodeIntegration: true,      // Allows your window to use Node.js
       contextIsolation: false,   // For simplicity in this first step

@@ -1,8 +1,8 @@
-// renderer.js - Now with resizable sidebar!
+// renderer.js - Now with Ctrl+W shortcut!
 
 // --- 1. Get elements from the DOM ---
-const sidebar = document.getElementById('sidebar'); // <-- ADDED
-const resizer = document.getElementById('resizer'); // <-- ADDED
+const sidebar = document.getElementById('sidebar');
+const resizer = document.getElementById('resizer');
 
 const urlBar = document.getElementById('url-bar');
 const backBtn = document.getElementById('back-btn');
@@ -10,7 +10,6 @@ const forwardBtn = document.getElementById('forward-btn');
 const reloadBtn = document.getElementById('reload-btn');
 
 const tabList = document.getElementById('tab-list');
-const addTabBtn = document.getElementById('add-tab-btn');
 const webviewContainer = document.getElementById('webview-container');
 
 // Get theme control elements
@@ -40,6 +39,9 @@ function closeTab(tabId) {
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
 
+    // Guard clause: Don't do anything if tab doesn't exist
+    if (!tabButton || !webview) return;
+
     // Get the ID of the tab to activate next
     let nextTabId = null;
     if (activeTabId === tabId) { // Only find a new tab if we're closing the active one
@@ -66,6 +68,10 @@ function closeTab(tabId) {
         if (remainingTabs.length === 0) {
             // We closed the last tab. Let's create a new one.
             createNewTab();
+        } else if (activeTabId === tabId) {
+            // We closed the active tab, but it was the last one.
+            // Activate the first tab in the list.
+            activateTab(remainingTabs[0].dataset.id);
         }
     }
 }
@@ -87,6 +93,9 @@ function activateTab(tabId) {
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
     
+    // Guard clause: If tab/webview was just closed, it might not exist
+    if (!tabButton || !webview) return;
+
     tabButton.classList.add('active');
     webview.classList.add('active');
 
@@ -113,7 +122,7 @@ function activateTab(tabId) {
 
 /**
  * Creates a new tab and its matching webview
- * @param {string} [url="https://www.google.com"] - The URL to load
+ * @param {string} [url="https.www.google.com"] - The URL to load
  */
 function createNewTab(url = "https://www.google.com") {
     const tabId = "tab-" + Date.now(); // Simple unique ID
@@ -187,12 +196,25 @@ function createNewTab(url = "https://www.google.com") {
     activateTab(tabId);
 }
 
-// --- 3. Global Event Listeners ---
+// --- 3. Global Event Listeners (UPDATED) ---
 
-addTabBtn.addEventListener('click', () => {
-    createNewTab();
+window.addEventListener('keydown', (event) => {
+    // "New Tab" shortcut
+    if (event.ctrlKey && event.key === 't') {
+        event.preventDefault(); // Stop any default browser action
+        createNewTab();
+    }
+    
+    // "Close Tab" shortcut
+    else if (event.ctrlKey && event.key === 'w') {
+        event.preventDefault(); // Stop any default browser action
+        if (activeTabId) {
+            closeTab(activeTabId);
+        }
+    }
 });
 
+// URL Bar "Enter" key
 urlBar.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         let url = urlBar.value;
@@ -203,6 +225,7 @@ urlBar.addEventListener('keydown', (event) => {
     }
 });
 
+// Nav buttons
 backBtn.addEventListener('click', () => {
     getActiveWebview().goBack();
 });
@@ -265,7 +288,7 @@ function initResizer() {
 
 // --- 4. Initialization ---
 createNewTab();
-initResizer(); // <-- ADDED
+initResizer();
 
 
 // --- 5. Theme Logic ---

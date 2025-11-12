@@ -65,10 +65,10 @@
             border-bottom: 1px solid var(--border-color);
         }
 
-        /* --- Nav & URL Bar --- */
+        /* --- Nav & URL Bar (UPDATED) --- */
         #nav-buttons {
             display: flex; justify-content: center; width: 100%;
-            margin-bottom: 15px;
+            /* margin-bottom: 15px; <-- DELETED this line */
         }
         #nav-buttons button {
             border: none; background: none; cursor: pointer;
@@ -89,24 +89,28 @@
             color: var(--text-primary);
             border-radius: 8px;
             box-sizing: border-box; outline: none;
+            margin-bottom: 8px; /* <-- MOVED margin from #nav-buttons to here */
         }
         #url-bar:focus {
             border-color: var(--text-accent);
             box-shadow: 0 0 0 2px var(--shadow-color);
         }
 
-        /* --- Tab List --- */
+        /* --- Tab List (UPDATED) --- */
         #tab-list {
             flex: 1;
-            overflow-y: auto; /* We keep 'auto' for function */
-            padding: 8px;
+            overflow-y: hidden;
+            overflow-x: hidden; /* <-- ADDED this line */
+            padding: 8px 0; /* Vertical padding only */
         }
         .tab-item {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 12px; font-size: 14px;
-            border-radius: 4px; border: none; width: 100%;
+            padding: 10px 12px; /* Inner padding for text */
+            margin: 0 8px 4px 8px; /* L/R Gaps */
+            width: calc(100% - 38px); /* Fit with gaps */
+            border-radius: 6px; border: none; 
             background-color: transparent;
-            text-align: left; margin-bottom: 4px;
+            text-align: left; 
             color: var(--text-secondary);
         }
         .tab-item:hover {
@@ -138,22 +142,10 @@
             background-color: var(--bg-hover);
         }
 
-        /* --- Bottom Buttons --- */
-        #add-tab-btn {
-            padding: 15px; font-size: 16px; border: none;
-            border-top: 1px solid var(--border-color);
-            background-color: var(--bg-btn-secondary);
-            color: var(--text-primary);
-            cursor: pointer; width: 100%;
-        }
-        #add-tab-btn:hover { 
-            background-color: var(--bg-hover);
-        }
-
         /* --- Theme Control Panel Styles --- */
         #theme-controls {
             padding: 12px;
-            border-top: 1px solid var(--border-color);
+            border-top: 1px solid var(--border-color); /* This provides the separator */
             background-color: var(--bg-btn-secondary);
         }
         #color-picker-wrapper {
@@ -169,10 +161,22 @@
         #sidebar-color-picker {
             width: 50px;
             height: 30px;
-            border: none;
-            padding: 0;
             background-color: transparent;
             cursor: pointer;
+            /* ADDED: Styles to match the button's "edges" */
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 2px; /* Add a little padding inside the border */
+        }
+
+        /* This targets the color swatch *inside* the input */
+        #sidebar-color-picker::-webkit-color-swatch {
+            border: none;
+            border-radius: 3px; /* Slightly smaller radius for the swatch */
+        }
+        #sidebar-color-picker::-moz-color-swatch {
+            border: none;
+            border-radius: 3px;
         }
         .theme-button {
             width: 100%;
@@ -189,35 +193,16 @@
             background-color: var(--bg-hover);
         }
         
-        /* --- Resizer Handle Style (CHANGED) --- */
+        /* --- Resizer Handle Style --- */
         #resizer {
             width: 4px;
-            background: transparent; /* <-- CHANGED: Invisible by default */
+            background: transparent; 
             cursor: col-resize;
             transition: background-color 0.2s ease;
         }
         #resizer:hover,
         #resizer.is-resizing {
-            background: var(--text-accent); /* <-- Visible on hover/drag */
-        }
-
-        /* */
-        /* These styles target the scrollbar in our tab list */
-        #tab-list::-webkit-scrollbar {
-            width: 8px; /* Width of the scrollbar "track" */
-        }
-        #tab-list::-webkit-scrollbar-track {
-            background: transparent; /* Make the track invisible */
-        }
-        #tab-list::-webkit-scrollbar-thumb {
-            background: transparent; /* Make the thumb invisible by default */
-            border-radius: 4px;
-        }
-        #tab-list:hover::-webkit-scrollbar-thumb {
-            background: var(--text-secondary); /* Show thumb on list hover */
-        }
-        #tab-list::-webkit-scrollbar-thumb:hover {
-            background: var(--text-accent); /* Highlight thumb on its own hover */
+            background: var(--text-accent); 
         }
 
         /* --- Webview Area --- */
@@ -250,8 +235,6 @@
             
             <div id="tab-list">
                 </div>
-
-            <button id="add-tab-btn">+</button>
 
             <div id="theme-controls">
                 <div id="color-picker-wrapper">
