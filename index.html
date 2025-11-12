@@ -4,113 +4,269 @@
     <meta charset="UTF-8">
     <title>Sol Browser</title>
     <style>
-        /* Basic reset */
+        /* :root defines our default "light" theme */
+        :root {
+            --bg-app: #f0f2f5;
+            --bg-sidebar: #e9ebee;
+            --bg-main: #fff;
+            --bg-hover: #ddd;
+            --bg-active: #fff;
+            --bg-btn-secondary: #f0f2f5;
+
+            --text-primary: #111;
+            --text-secondary: #555;
+            --text-accent: #1a73e8;
+            
+            --border-color: #ddd;
+            --shadow-color: rgba(26,115,232,0.2);
+        }
+
+        body[data-theme="dark"] {
+            --bg-app: #1a1a1a;
+            --bg-sidebar: #252525;
+            --bg-main: #1e1e1e;
+            --bg-hover: #3a3a3a;
+            --bg-active: #333;
+            --bg-btn-secondary: #333;
+
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --text-accent: #4a90e2;
+            
+            --border-color: #444;
+            --shadow-color: rgba(74,144,226,0.2);
+        }
+        
+        /* --- Base Styles --- */
         body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background-color: #f0f2f5;
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            overflow: hidden; 
+            font-family: -apple-system, sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-primary);
         }
-
-        /* Our main app layout now uses 'row' to put things side-by-side
-        */
         #app-container {
-            display: flex;
-            flex-direction: row; /* This is the key change! */
-            height: 100vh;
+            display: flex; flex-direction: row; height: 100vh;
         }
 
-        /* This is our new sidebar, replacing the old #nav-bar
-        */
+        /* --- Sidebar Styles --- */
         #sidebar {
-            display: flex;
-            flex-direction: column; /* Stack controls vertically */
-            align-items: center; /* Center the buttons */
-            width: 280px; /* Give it a fixed width like Arc */
-            padding: 20px 12px;
-            background-color: #e9ebee; /* A nice sidebar color */
-            border-right: 1px solid #ddd;
-            box-sizing: border-box; /* Include padding in the width */
+            display: flex; flex-direction: column;
+            flex-basis: 280px;
+            flex-shrink: 0; 
+            flex-grow: 0;   
+            min-width: 200px; 
+            max-width: 600px; 
+            background-color: var(--bg-sidebar);
+            border-right: 1px solid var(--border-color);
+        }
+        #sidebar-controls {
+            padding: 12px;
+            border-bottom: 1px solid var(--border-color);
         }
 
-        /* We updated the styles for the controls to fit the new sidebar
-        */
+        /* --- Nav & URL Bar --- */
         #nav-buttons {
-            display: flex;
-            justify-content: center; /* Center buttons horizontally */
-            width: 100%;
+            display: flex; justify-content: center; width: 100%;
             margin-bottom: 15px;
         }
-
         #nav-buttons button {
-            border: none;
-            background: none;
-            cursor: pointer;
-            font-size: 18px;
-            padding: 8px 12px;
-            border-radius: 5px;
+            border: none; background: none; cursor: pointer;
+            font-size: 18px; padding: 8px 12px; border-radius: 5px;
+            color: var(--text-secondary);
         }
-        #nav-buttons button:hover {
-            background-color: #ddd;
+        #nav-buttons button:hover { 
+            background-color: var(--bg-hover);
         }
-        #nav-buttons button:disabled {
+        #nav-buttons button:disabled { 
             color: #aaa;
-            cursor: not-allowed;
+            background-color: transparent;
         }
-
-        /* The URL bar now fits vertically in the sidebar
-        */
         #url-bar {
-            width: 100%;
-            padding: 10px 14px;
-            font-size: 14px;
-            border: 1px solid #ccc;
-            border-radius: 8px; /* Less rounded for a "block" feel */
-            margin-bottom: 15px;
-            box-sizing: border-box; /* Important! */
-            outline: none;
+            width: 100%; padding: 10px 14px; font-size: 14px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            border-radius: 8px;
+            box-sizing: border-box; outline: none;
         }
         #url-bar:focus {
-            border-color: #1a73e8;
-            box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+            border-color: var(--text-accent);
+            box-shadow: 0 0 0 2px var(--shadow-color);
         }
 
-        /* The webview container just takes up the remaining space
-        */
-        #webview-container {
-            flex: 1; /* Take up all remaining space */
-            position: relative;
+        /* --- Tab List --- */
+        #tab-list {
+            flex: 1;
+            overflow-y: auto; /* We keep 'auto' for function */
+            padding: 8px;
+        }
+        .tab-item {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 12px; font-size: 14px;
+            border-radius: 4px; border: none; width: 100%;
+            background-color: transparent;
+            text-align: left; margin-bottom: 4px;
+            color: var(--text-secondary);
+        }
+        .tab-item:hover {
+            background-color: var(--bg-hover);
+        }
+        .tab-item.active {
+            background-color: var(--bg-active);
+            font-weight: 600;
+            color: var(--text-accent);
+        }
+        .tab-item.active:hover {
+            background-color: var(--bg-active);
+        }
+        .tab-title {
+            flex: 1; overflow: hidden; text-overflow: ellipsis;
+            white-space: nowrap; cursor: pointer; padding-right: 8px;
+        }
+        .tab-close-btn {
+            border: none; background: none; padding: 4px;
+            border-radius: 50%; font-size: 12px;
+            font-weight: bold; cursor: pointer;
+            width: 18px; height: 18px; line-height: 1;
+            color: var(--text-secondary);
+        }
+        .tab-close-btn:hover {
+            background-color: #ccc;
+        }
+        .tab-item.active .tab-close-btn:hover {
+            background-color: var(--bg-hover);
         }
 
-        webview {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+        /* --- Bottom Buttons --- */
+        #add-tab-btn {
+            padding: 15px; font-size: 16px; border: none;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--bg-btn-secondary);
+            color: var(--text-primary);
+            cursor: pointer; width: 100%;
+        }
+        #add-tab-btn:hover { 
+            background-color: var(--bg-hover);
+        }
+
+        /* --- Theme Control Panel Styles --- */
+        #theme-controls {
+            padding: 12px;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--bg-btn-secondary);
+        }
+        #color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        #color-picker-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        #sidebar-color-picker {
+            width: 50px;
+            height: 30px;
             border: none;
+            padding: 0;
+            background-color: transparent;
+            cursor: pointer;
+        }
+        .theme-button {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+        .theme-button:hover {
+            background-color: var(--bg-hover);
+        }
+        
+        /* --- Resizer Handle Style (CHANGED) --- */
+        #resizer {
+            width: 4px;
+            background: transparent; /* <-- CHANGED: Invisible by default */
+            cursor: col-resize;
+            transition: background-color 0.2s ease;
+        }
+        #resizer:hover,
+        #resizer.is-resizing {
+            background: var(--text-accent); /* <-- Visible on hover/drag */
+        }
+
+        /* */
+        /* These styles target the scrollbar in our tab list */
+        #tab-list::-webkit-scrollbar {
+            width: 8px; /* Width of the scrollbar "track" */
+        }
+        #tab-list::-webkit-scrollbar-track {
+            background: transparent; /* Make the track invisible */
+        }
+        #tab-list::-webkit-scrollbar-thumb {
+            background: transparent; /* Make the thumb invisible by default */
+            border-radius: 4px;
+        }
+        #tab-list:hover::-webkit-scrollbar-thumb {
+            background: var(--text-secondary); /* Show thumb on list hover */
+        }
+        #tab-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-accent); /* Highlight thumb on its own hover */
+        }
+
+        /* --- Webview Area --- */
+        #webview-container {
+            flex: 1;
+            display: flex; 
+            flex-direction: column; 
+            background-color: var(--bg-main);
+        }
+        .webview-item {
+            flex: 1; border: none; display: none; 
+        }
+        .webview-item.active {
+            display: flex; 
         }
     </style>
 </head>
 <body>
-
     <div id="app-container">
 
         <div id="sidebar">
-            <input type="text" id="url-bar" placeholder="https://">
-            <div id="nav-buttons">
-                <button id="back-btn" disabled>&larr;</button>
-                <button id="forward-btn" disabled>&rarr;</button>
-                <button id="reload-btn">&#x21bb;</button>
+            <div id="sidebar-controls">
+                <input type="text" id="url-bar" placeholder="https://">
+                <div id="nav-buttons">
+                    <button id="back-btn" disabled>&larr;</button>
+                    <button id="forward-btn" disabled>&rarr;</button>
+                    <button id="reload-btn">&#x21bb;</button>
+                </div>
             </div>
+            
+            <div id="tab-list">
+                </div>
+
+            <button id="add-tab-btn">+</button>
+
+            <div id="theme-controls">
+                <div id="color-picker-wrapper">
+                    <label id="color-picker-label" for="sidebar-color-picker">Sidebar Color</label>
+                    <input type="color" id="sidebar-color-picker" value="#e9ebee">
+                </div>
+                <button id="dark-mode-toggle-btn" class="theme-button">Toggle Dark Mode</button>
+                <button id="reset-color-btn" class="theme-button">Reset Color</button>
             </div>
+        </div>
+
+        <div id="resizer"></div>
 
         <div id="webview-container">
-            <webview id="browser-view" src="https://www.google.com" autosize="on"></webview>
-        </div>
+            </div>
 
     </div>
 
