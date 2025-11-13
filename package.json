@@ -4,7 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
-  "start": "electron ."
+    "start": "electron ."
   },
   "keywords": [],
   "author": "",
@@ -12,5 +12,8 @@
   "type": "commonjs",
   "devDependencies": {
     "electron": "^39.1.2"
+  },
+  "dependencies": {
+    "sortablejs": "^1.15.6"
   }
 }

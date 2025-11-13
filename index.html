@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Sol Browser</title>
     <style>
-        /* :root defines our default "light" theme */
+        /* :root ... (all your theme variables) ... */
         :root {
             --bg-app: #f0f2f5;
             --bg-sidebar: #e9ebee;
@@ -37,7 +37,7 @@
             --shadow-color: rgba(74,144,226,0.2);
         }
         
-        /* --- Base Styles --- */
+        /* ... (all base styles) ... */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
             overflow: hidden; 
@@ -49,7 +49,7 @@
             display: flex; flex-direction: row; height: 100vh;
         }
 
-        /* --- Sidebar Styles --- */
+        /* ... (all sidebar, nav, tab, folder styles) ... */
         #sidebar {
             display: flex; flex-direction: column;
             flex-basis: 280px;
@@ -64,11 +64,8 @@
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
         }
-
-        /* --- Nav & URL Bar (UPDATED) --- */
         #nav-buttons {
             display: flex; justify-content: center; width: 100%;
-            /* margin-bottom: 15px; <-- DELETED this line */
         }
         #nav-buttons button {
             border: none; background: none; cursor: pointer;
@@ -89,25 +86,23 @@
             color: var(--text-primary);
             border-radius: 8px;
             box-sizing: border-box; outline: none;
-            margin-bottom: 8px; /* <-- MOVED margin from #nav-buttons to here */
+            margin-bottom: 15px;
         }
         #url-bar:focus {
             border-color: var(--text-accent);
             box-shadow: 0 0 0 2px var(--shadow-color);
         }
-
-        /* --- Tab List (UPDATED) --- */
         #tab-list {
             flex: 1;
-            overflow-y: hidden;
-            overflow-x: hidden; /* <-- ADDED this line */
+            overflow-y: auto;
+            overflow-x: hidden;
             padding: 8px 0; /* Vertical padding only */
         }
         .tab-item {
             display: flex; align-items: center; justify-content: space-between;
-            padding: 10px 12px; /* Inner padding for text */
-            margin: 0 8px 4px 8px; /* L/R Gaps */
-            width: calc(100% - 38px); /* Fit with gaps */
+            padding: 10px 12px;
+            margin: 0 8px 4px 8px;
+            width: calc(100% - 38px);
             border-radius: 6px; border: none; 
             background-color: transparent;
             text-align: left; 
@@ -141,12 +136,52 @@
         .tab-item.active .tab-close-btn:hover {
             background-color: var(--bg-hover);
         }
+        .folder-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            margin: 4px 8px;
+            border-radius: 6px;
+            background-color: var(--bg-hover);
+            cursor: pointer;
+        }
+        .folder-toggle {
+            margin-right: 8px;
+            font-size: 10px;
+            transition: transform 0.2s ease;
+        }
+        .folder-item.collapsed .folder-toggle {
+            transform: rotate(-90deg);
+        }
+        .folder-title {
+            flex: 1;
+            font-weight: bold;
+            color: var(--text-primary);
+            outline: none;
+        }
+        .folder-title[contenteditable="true"] {
+            background-color: var(--bg-main);
+            padding: 2px 4px;
+            margin: -2px -4px;
+            border-radius: 3px;
+        }
 
-        /* --- Theme Control Panel Styles --- */
+        .folder-content {
+            padding-top: 4px;
+            border-left: 2px solid var(--border-color);
+            margin-left: 18px;
+        }
+        .folder-item.collapsed + .folder-content {
+            display: none;
+        }
         #theme-controls {
             padding: 12px;
-            border-top: 1px solid var(--border-color); /* This provides the separator */
+            border-top: 1px solid var(--border-color);
             background-color: var(--bg-btn-secondary);
+            display: none; /* <-- HIDDEN BY DEFAULT */
+        }
+        #theme-controls.visible {
+            display: block;
         }
         #color-picker-wrapper {
             display: flex;
@@ -163,16 +198,13 @@
             height: 30px;
             background-color: transparent;
             cursor: pointer;
-            /* ADDED: Styles to match the button's "edges" */
             border: 1px solid var(--border-color);
             border-radius: 6px;
-            padding: 2px; /* Add a little padding inside the border */
+            padding: 2px;
         }
-
-        /* This targets the color swatch *inside* the input */
         #sidebar-color-picker::-webkit-color-swatch {
             border: none;
-            border-radius: 3px; /* Slightly smaller radius for the swatch */
+            border-radius: 3px;
         }
         #sidebar-color-picker::-moz-color-swatch {
             border: none;
@@ -193,7 +225,7 @@
             background-color: var(--bg-hover);
         }
         
-        /* --- Resizer Handle Style --- */
+        /* ... (resizer, scrollbar, webview, context menu styles) ... */
         #resizer {
             width: 4px;
             background: transparent; 
@@ -204,8 +236,22 @@
         #resizer.is-resizing {
             background: var(--text-accent); 
         }
-
-        /* --- Webview Area --- */
+        #tab-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #tab-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #tab-list::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 4px;
+        }
+        #tab-list:hover::-webkit-scrollbar-thumb {
+            background: var(--text-secondary);
+        }
+        #tab-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-accent);
+        }
         #webview-container {
             flex: 1;
             display: flex; 
@@ -218,12 +264,87 @@
         .webview-item.active {
             display: flex; 
         }
+        #context-menu {
+            position: absolute;
+            display: none;
+            background-color: var(--bg-btn-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 4px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-width: 180px;
+            z-index: 1000;
+        }
+        .context-menu-btn {
+            background: none;
+            border: none;
+            display: block;
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 14px;
+            text-align: left;
+            border-radius: 6px;
+            cursor: pointer;
+            color: var(--text-primary);
+        }
+        .context-menu-btn:hover {
+            background-color: var(--bg-hover);
+            color: var(--text-accent);
+        }
+        .context-menu-separator {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 4px 0;
+        }
+        .context-menu-btn {
+            display: none;
+        }
+
+        /* --- Sidebar Footer Styles (UPDATED) --- */
+        #sidebar-footer {
+            padding: 4px 12px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        #settings-btn {
+            background: none;
+            border: none;
+            padding: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            /* Ensure the button doesn't have extra line-height */
+            line-height: 0; 
+        }
+        
+        /* NEW: Style for the image inside the button */
+        #settings-btn img {
+            width: 20px;
+            height: 20px;
+            /* This will make the icon color match the text */
+            /* Note: This only works for single-color SVGs! */
+            filter: var(--text-primary) drop-shadow(0 0 0); 
+            opacity: 0.7;
+        }
+
+        #settings-btn:hover {
+            background-color: var(--bg-hover);
+        }
+
+        /* NEW: Style for the image when active/hovered */
+        #settings-btn:hover img {
+            opacity: 1;
+        }
+        #settings-btn.active img {
+            opacity: 1;
+            filter: var(--text-accent) drop-shadow(0 0 0);
+        }
     </style>
 </head>
 <body>
     <div id="app-container">
 
         <div id="sidebar">
+            
             <div id="sidebar-controls">
                 <input type="text" id="url-bar" placeholder="https://">
                 <div id="nav-buttons">
@@ -244,13 +365,24 @@
                 <button id="dark-mode-toggle-btn" class="theme-button">Toggle Dark Mode</button>
                 <button id="reset-color-btn" class="theme-button">Reset Color</button>
             </div>
-        </div>
+            
+            <div id="sidebar-footer">
+                <button id="settings-btn" title="Settings">
+                    <img src="./assets/settings.svg" alt="Settings">
+                </button>
+            </div>
 
-        <div id="resizer"></div>
+        </div> <div id="resizer"></div>
 
         <div id="webview-container">
             </div>
 
+    </div>
+
+    <div id="context-menu">
+        <button id="ctx-add-folder" class="context-menu-btn">New Folder</button>
+        <button id="ctx-rename-folder" class="context-menu-btn">Rename</button>
+        <button id="ctx-delete-folder" class="context-menu-btn" style="color: #f00;">Delete Folder</button>
     </div>
 
     <script src="./renderer.js"></script>
