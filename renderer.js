@@ -1,6 +1,7 @@
-// renderer.js - Now with a custom context menu!
+// renderer.js - Now with IPC for menu controls!
 
 const Sortable = require('sortablejs');
+const { ipcRenderer } = require('electron'); // <-- NEW: Import ipcRenderer
 
 // --- 1. Get elements from the DOM ---
 const sidebar = document.getElementById('sidebar');
@@ -18,16 +19,21 @@ const webviewContainer = document.getElementById('webview-container');
 const darkModeToggleBtn = document.getElementById('dark-mode-toggle-btn');
 const colorPicker = document.getElementById('sidebar-color-picker');
 const resetColorBtn = document.getElementById('reset-color-btn');
-// const addFolderBtn = document.getElementById('add-folder-btn'); // <-- DELETED
-// Settings Toggle Elements
-const settingsBtn = document.getElementById('settings-btn');
-const themeControls = document.getElementById('theme-controls');
 
 // Context Menu elements
 const contextMenu = document.getElementById('context-menu');
 const ctxAddFolder = document.getElementById('ctx-add-folder');
 const ctxRenameFolder = document.getElementById('ctx-rename-folder');
 const ctxDeleteFolder = document.getElementById('ctx-delete-folder');
+
+// Settings Toggle Elements
+const settingsBtn = document.getElementById('settings-btn');
+const themeControls = document.getElementById('theme-controls');
+
+// NEW: Menu buttons
+const toggleFullscreenBtn = document.getElementById('toggle-fullscreen-btn');
+const toggleDevtoolsBtn = document.getElementById('toggle-devtools-btn');
+const quitBtn = document.getElementById('quit-btn');
 
 
 // A global variable to track the currently active tab ID
@@ -168,32 +174,28 @@ function createNewTab(url = "https://www.google.com") {
     });
     
     // 4. Add the new elements to the DOM
-    tabList.appendChild(tabButton); // Always add to the main list
+    tabList.appendChild(tabButton);
     webviewContainer.appendChild(webview);
 
     // 5. Activate the new tab
     activateTab(tabId);
 }
 
-/**
- * --- UPDATED: Creates a new folder ---
- */
 function createNewFolder() {
     const folderId = "folder-" + Date.now();
 
     // 1. Create Folder Header
     const folderItem = document.createElement('div');
     folderItem.className = 'folder-item';
-    folderItem.setAttribute('data-id', folderId); // <-- Store its ID
+    folderItem.setAttribute('data-id', folderId);
 
     const toggle = document.createElement('span');
     toggle.className = 'folder-toggle';
-    toggle.innerHTML = '&#9660;'; // Down arrow
+    toggle.innerHTML = '&#9660;';
     
     const title = document.createElement('span');
     title.className = 'folder-title';
     title.textContent = 'New Folder';
-    // title.setAttribute('contenteditable', 'true'); // <-- REMOVED
 
     folderItem.appendChild(toggle);
     folderItem.appendChild(title);
@@ -201,11 +203,10 @@ function createNewFolder() {
     // 2. Create Folder Content (the drop zone)
     const folderContent = document.createElement('div');
     folderContent.className = 'folder-content';
-    folderContent.id = folderId; // Give it an ID for Sortable
+    folderContent.id = folderId;
 
     // 3. Add Collapse/Expand listener
     folderItem.addEventListener('click', (e) => {
-        // Don't collapse when clicking the title (e.g., during rename)
         if (e.target.className === 'folder-title') return;
         folderItem.classList.toggle('collapsed');
     });
@@ -216,25 +217,18 @@ function createNewFolder() {
 
     // 5. Make the new folder content area sortable
     new Sortable(folderContent, {
-        group: 'shared-tabs', // Must match the main list
+        group: 'shared-tabs',
         animation: 150,
     });
 }
 
-/**
- * --- NEW: Finishes the rename process ---
- */
 function stopEditingFolderTitle(titleElement) {
     titleElement.setAttribute('contenteditable', 'false');
     titleElement.removeEventListener('blur', stopEditingFolderTitle);
     titleElement.removeEventListener('keydown', handleRenameKeys);
-    // Clear selection
     window.getSelection().removeAllRanges();
 }
 
-/**
- * --- NEW: Handles Enter/Escape during rename ---
- */
 function handleRenameKeys(e) {
     if (e.key === 'Enter' || e.key === 'Escape') {
         e.preventDefault();
@@ -267,7 +261,6 @@ urlBar.addEventListener('keydown', (event) => {
     }
 });
 
-// Nav buttons
 backBtn.addEventListener('click', () => {
     getActiveWebview().goBack();
 });
@@ -355,50 +348,40 @@ darkModeToggleBtn.addEventListener('click', () => {
 if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.dataset.theme = 'dark';
     darkModeToggleBtn.textContent = 'Switch to Light Mode';
-    colorPicker.value = '#252525';
+    colorPicker.value = '#25252G';
 } else {
     darkModeToggleBtn.textContent = 'Switch to Dark Mode';
     colorPicker.value = '#e9ebee';
 }
 
-// --- 6. NEW: Context Menu Logic ---
+// --- 6. Context Menu Logic ---
 
-// Hide menu on any left-click
 window.addEventListener('click', () => {
     contextMenu.style.display = 'none';
 });
 
-// Main context menu listener for the sidebar
 sidebar.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 
-    // Find what we clicked on
     const clickedFolder = e.target.closest('.folder-item');
 
-    // Hide all buttons first
     ctxAddFolder.style.display = 'none';
     ctxRenameFolder.style.display = 'none';
     ctxDeleteFolder.style.display = 'none';
 
     if (clickedFolder) {
-        // We right-clicked a folder
         ctxRenameFolder.style.display = 'block';
         ctxDeleteFolder.style.display = 'block';
-        // Store which folder we clicked
         contextMenu.dataset.targetId = clickedFolder.dataset.id;
     } else {
-        // We clicked on empty space (or a tab, but we'll just show 'Add Folder')
         ctxAddFolder.style.display = 'block';
-        contextMenu.dataset.targetId = ''; // Clear target
+        contextMenu.dataset.targetId = '';
     }
 
-    // Position and show the menu
     contextMenu.style.top = `${e.clientY}px`;
     contextMenu.style.left = `${e.clientX}px`;
     contextMenu.style.display = 'block';
 });
-
-// --- NEW: Context Menu Button Listeners ---
 
 ctxAddFolder.addEventListener('click', () => {
     createNewFolder();
@@ -411,14 +394,11 @@ ctxRenameFolder.addEventListener('click', () => {
     if (folderHeader) {
         const titleElement = folderHeader.querySelector('.folder-title');
         
-        // Make it editable
         titleElement.setAttribute('contenteditable', 'true');
         
-        // Add listeners to stop editing
         titleElement.addEventListener('blur', () => stopEditingFolderTitle(titleElement));
         titleElement.addEventListener('keydown', handleRenameKeys);
 
-        // Focus and select the text
         titleElement.focus();
         document.execCommand('selectAll', false, null);
     }
@@ -431,22 +411,32 @@ ctxDeleteFolder.addEventListener('click', () => {
     const folderContent = document.getElementById(folderId);
 
     if (folderHeader && folderContent) {
-        // Move all tabs inside this folder back to the main tabList
         const tabsInFolder = folderContent.querySelectorAll('.tab-item');
         tabsInFolder.forEach(tab => {
-            tabList.appendChild(tab); // Move it
+            tabList.appendChild(tab);
         });
         
-        // Now, delete the empty folder
         folderHeader.remove();
         folderContent.remove();
     }
-contextMenu.style.display = 'none';
-// --- 7. NEW: Settings Toggle Logic ---
-settingsBtn.addEventListener('click', () => {
-// Toggle the panel
-themeControls.classList.toggle('visible');
-// Toggle the button's "active" state
-settingsBtn.classList.toggle('active');
+    contextMenu.style.display = 'none';
 });
+
+// --- 7. Settings Toggle Logic ---
+settingsBtn.addEventListener('click', () => {
+    themeControls.classList.toggle('visible');
+    settingsBtn.classList.toggle('active');
+});
+
+// --- 8. NEW: Menu Button IPC Listeners ---
+toggleFullscreenBtn.addEventListener('click', () => {
+    ipcRenderer.send('toggle-fullscreen');
+});
+
+toggleDevtoolsBtn.addEventListener('click', () => {
+    ipcRenderer.send('toggle-devtools');
+});
+
+quitBtn.addEventListener('click', () => {
+    ipcRenderer.send('quit-app');
 });

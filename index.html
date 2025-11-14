@@ -225,6 +225,13 @@
             background-color: var(--bg-hover);
         }
         
+        /* NEW: Separator style for the settings panel */
+        .settings-separator {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 10px 0;
+        }
+
         /* ... (resizer, scrollbar, webview, context menu styles) ... */
         #resizer {
             width: 4px;
@@ -299,38 +306,27 @@
         .context-menu-btn {
             display: none;
         }
-
-        /* --- Sidebar Footer Styles (UPDATED) --- */
         #sidebar-footer {
             padding: 4px 12px;
             border-top: 1px solid var(--border-color);
         }
-
         #settings-btn {
             background: none;
             border: none;
             padding: 6px;
             border-radius: 6px;
             cursor: pointer;
-            /* Ensure the button doesn't have extra line-height */
             line-height: 0; 
         }
-        
-        /* NEW: Style for the image inside the button */
         #settings-btn img {
             width: 20px;
             height: 20px;
-            /* This will make the icon color match the text */
-            /* Note: This only works for single-color SVGs! */
             filter: var(--text-primary) drop-shadow(0 0 0); 
             opacity: 0.7;
         }
-
         #settings-btn:hover {
             background-color: var(--bg-hover);
         }
-
-        /* NEW: Style for the image when active/hovered */
         #settings-btn:hover img {
             opacity: 1;
         }
@@ -364,6 +360,13 @@
                 </div>
                 <button id="dark-mode-toggle-btn" class="theme-button">Toggle Dark Mode</button>
                 <button id="reset-color-btn" class="theme-button">Reset Color</button>
+                
+                <div class="settings-separator"></div>
+                <button id="toggle-fullscreen-btn" class="theme-button">Toggle Fullscreen</button>
+                <button id="toggle-devtools-btn" class="theme-button">Toggle DevTools</button>
+                <div class="settings-separator"></div>
+                <button id="quit-btn" class="theme-button" style="color: #f00;">Quit Sol Browser</button>
+
             </div>
             
             <div id="sidebar-footer">
