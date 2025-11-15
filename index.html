@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Sol Browser</title>
     <style>
-        /* :root ... (all your theme variables) ... */
+        /* :root defines our default "light" theme */
         :root {
             --bg-app: #f0f2f5;
             --bg-sidebar: #e9ebee;
@@ -37,7 +37,7 @@
             --shadow-color: rgba(74,144,226,0.2);
         }
         
-        /* ... (all base styles) ... */
+        /* --- Base Styles --- */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
             overflow: hidden; 
@@ -49,21 +49,25 @@
             display: flex; flex-direction: row; height: 100vh;
         }
 
-        /* ... (all sidebar, nav, tab, folder styles) ... */
+        /* --- Sidebar Styles (UPDATED) --- */
         #sidebar {
             display: flex; flex-direction: column;
-            flex-basis: 280px;
+            flex-basis: 280px; /* Default width */
             flex-shrink: 0; 
             flex-grow: 0;   
             min-width: 200px; 
             max-width: 600px; 
             background-color: var(--bg-sidebar);
             border-right: 1px solid var(--border-color);
+            overflow: hidden; /* Hide content when shrinking */
+            transition: flex-basis 0.3s ease-in-out, border-right 0.3s ease-in-out; /* Animation */
         }
         #sidebar-controls {
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
         }
+
+        /* --- Nav & URL Bar --- */
         #nav-buttons {
             display: flex; justify-content: center; width: 100%;
         }
@@ -92,12 +96,16 @@
             border-color: var(--text-accent);
             box-shadow: 0 0 0 2px var(--shadow-color);
         }
+
+        /* --- Tab List --- */
         #tab-list {
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
             padding: 8px 0; /* Vertical padding only */
         }
+
+        /* --- Tab Item Styles --- */
         .tab-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 10px 12px;
@@ -136,6 +144,8 @@
         .tab-item.active .tab-close-btn:hover {
             background-color: var(--bg-hover);
         }
+        
+        /* --- Folder Item Styles --- */
         .folder-item {
             display: flex;
             align-items: center;
@@ -174,15 +184,19 @@
         .folder-item.collapsed + .folder-content {
             display: none;
         }
+
+        /* --- Theme Control Panel Styles --- */
         #theme-controls {
             padding: 12px;
             border-top: 1px solid var(--border-color);
             background-color: var(--bg-btn-secondary);
             display: none; /* <-- HIDDEN BY DEFAULT */
         }
+        
         #theme-controls.visible {
             display: block;
         }
+
         #color-picker-wrapper {
             display: flex;
             align-items: center;
@@ -210,6 +224,7 @@
             border: none;
             border-radius: 3px;
         }
+
         .theme-button {
             width: 100%;
             padding: 8px;
@@ -225,24 +240,25 @@
             background-color: var(--bg-hover);
         }
         
-        /* NEW: Separator style for the settings panel */
         .settings-separator {
             height: 1px;
             background-color: var(--border-color);
             margin: 10px 0;
         }
 
-        /* ... (resizer, scrollbar, webview, context menu styles) ... */
+        /* --- Resizer Handle Style (UPDATED) --- */
         #resizer {
             width: 4px;
             background: transparent; 
             cursor: col-resize;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.2s ease, width 0.3s ease-in-out; /* Added width transition */
         }
         #resizer:hover,
         #resizer.is-resizing {
             background: var(--text-accent); 
         }
+
+        /* --- Custom Scrollbar --- */
         #tab-list::-webkit-scrollbar {
             width: 8px;
         }
@@ -259,6 +275,8 @@
         #tab-list::-webkit-scrollbar-thumb:hover {
             background: var(--text-accent);
         }
+
+        /* --- Webview Area --- */
         #webview-container {
             flex: 1;
             display: flex; 
@@ -271,6 +289,8 @@
         .webview-item.active {
             display: flex; 
         }
+
+        /* --- Context Menu --- */
         #context-menu {
             position: absolute;
             display: none;
@@ -306,6 +326,8 @@
         .context-menu-btn {
             display: none;
         }
+        
+        /* --- Sidebar Footer Styles --- */
         #sidebar-footer {
             padding: 4px 12px;
             border-top: 1px solid var(--border-color);
@@ -334,6 +356,18 @@
             opacity: 1;
             filter: var(--text-accent) drop-shadow(0 0 0);
         }
+
+        /* --- NEW: Sidebar Toggle Styles (UPDATED) --- */
+        #sidebar.hidden {
+            flex-basis: 0 !important; /* Forces width to 0 */
+            min-width: 0 !important;
+            border-right: none; /* Hides border when collapsed */
+        }
+        #resizer.hidden {
+            width: 0 !important; /* Hides resizer */
+            pointer-events: none; /* Make it unclickable */
+        }
+        
     </style>
 </head>
 <body>

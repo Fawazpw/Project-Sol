@@ -1,7 +1,7 @@
-// renderer.js - Now with IPC for menu controls!
+// renderer.js - Now with animated sidebar toggle!
 
 const Sortable = require('sortablejs');
-const { ipcRenderer } = require('electron'); // <-- NEW: Import ipcRenderer
+const { ipcRenderer } = require('electron');
 
 // --- 1. Get elements from the DOM ---
 const sidebar = document.getElementById('sidebar');
@@ -30,7 +30,7 @@ const ctxDeleteFolder = document.getElementById('ctx-delete-folder');
 const settingsBtn = document.getElementById('settings-btn');
 const themeControls = document.getElementById('theme-controls');
 
-// NEW: Menu buttons
+// Menu buttons
 const toggleFullscreenBtn = document.getElementById('toggle-fullscreen-btn');
 const toggleDevtoolsBtn = document.getElementById('toggle-devtools-btn');
 const quitBtn = document.getElementById('quit-btn');
@@ -239,15 +239,25 @@ function handleRenameKeys(e) {
 // --- 3. Global Event Listeners ---
 
 window.addEventListener('keydown', (event) => {
+    // "New Tab" shortcut
     if (event.ctrlKey && event.key === 't') {
-        event.preventDefault();
+        event.preventDefault(); 
         createNewTab();
     }
+    
+    // "Close Tab" shortcut
     else if (event.ctrlKey && event.key === 'w') {
-        event.preventDefault();
+        event.preventDefault(); 
         if (activeTabId) {
             closeTab(activeTabId);
         }
+    }
+
+    // "Toggle Sidebar" shortcut
+    else if (event.ctrlKey && event.key === 's') {
+        event.preventDefault();
+        sidebar.classList.toggle('hidden');
+        resizer.classList.toggle('hidden');
     }
 });
 
@@ -348,7 +358,7 @@ darkModeToggleBtn.addEventListener('click', () => {
 if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.body.dataset.theme = 'dark';
     darkModeToggleBtn.textContent = 'Switch to Light Mode';
-    colorPicker.value = '#25252G';
+    colorPicker.value = '#252525';
 } else {
     darkModeToggleBtn.textContent = 'Switch to Dark Mode';
     colorPicker.value = '#e9ebee';
@@ -428,13 +438,13 @@ settingsBtn.addEventListener('click', () => {
     settingsBtn.classList.toggle('active');
 });
 
-// --- 8. NEW: Menu Button IPC Listeners ---
+// --- 8. Menu Button IPC Listeners ---
 toggleFullscreenBtn.addEventListener('click', () => {
     ipcRenderer.send('toggle-fullscreen');
 });
 
 toggleDevtoolsBtn.addEventListener('click', () => {
-    ipcRenderer.send('toggle-devtools');
+    ipcRenderer.send('toggle-devtools'); // <-- THIS IS THE FIXED LINE
 });
 
 quitBtn.addEventListener('click', () => {
