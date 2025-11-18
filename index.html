@@ -51,7 +51,8 @@
 
         /* --- Sidebar Styles (UPDATED) --- */
         #sidebar {
-            display: flex; flex-direction: column;
+            display: flex;
+            flex-direction: column;
             flex-basis: 280px; /* Default width */
             flex-shrink: 0; 
             flex-grow: 0;   
@@ -60,8 +61,11 @@
             background-color: var(--bg-sidebar);
             border-right: 1px solid var(--border-color);
             overflow: hidden; /* Hide content when shrinking */
-            transition: flex-basis 0.3s ease-in-out, border-right 0.3s ease-in-out; /* Animation */
+            
+            /* UPDATED: Added min-width to the transition */
+            transition: flex-basis 0.3s ease-in-out, min-width 0.3s ease-in-out, border-right 0.3s ease-in-out;
         }
+
         #sidebar-controls {
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
