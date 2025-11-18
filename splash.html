@@ -8,7 +8,6 @@
             margin: 0;
             padding: 0;
             overflow: hidden;
-            /* CHANGED: This makes the webpage background transparent */
             background-color: transparent; 
         }
         body {
@@ -16,22 +15,27 @@
             align-items: center;
             justify-content: center;
             height: 100vh;
-            /* Animation to fade in the logo */
-            animation: fadeIn 0.8s ease-in-out;
         }
-        img {
-            /* Set a size for your logo */
-            width: 128px;
-            height: 128px;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+        /* This div will be where the animation plays */
+        #lottie-animation {
+            width: 150px;
+            height: 150px;
         }
     </style>
 </head>
 <body>
-    <img src="./assets/Sol Logo.png" alt="Loading...">
+    <div id="lottie-animation"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+
+    <script>
+        lottie.loadAnimation({
+            container: document.getElementById('lottie-animation'), // the div
+            renderer: 'svg',
+            loop: true,
+            autoplay: true,
+            path: './assets/sol startup.json' // the path to your .json file
+        });
+    </SCriPt>
 </body>
 </html>
