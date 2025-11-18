@@ -1,4 +1,4 @@
-// renderer.js - Now with animated sidebar toggle!
+// renderer.js - Now with nested folders!
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
@@ -15,6 +15,7 @@ const reloadBtn = document.getElementById('reload-btn');
 const tabList = document.getElementById('tab-list');
 const webviewContainer = document.getElementById('webview-container');
 
+
 // Get theme control elements
 const darkModeToggleBtn = document.getElementById('dark-mode-toggle-btn');
 const colorPicker = document.getElementById('sidebar-color-picker');
@@ -22,6 +23,7 @@ const resetColorBtn = document.getElementById('reset-color-btn');
 
 // Context Menu elements
 const contextMenu = document.getElementById('context-menu');
+const ctxAddNestedFolder = document.getElementById('ctx-add-nested-folder');
 const ctxAddFolder = document.getElementById('ctx-add-folder');
 const ctxRenameFolder = document.getElementById('ctx-rename-folder');
 const ctxDeleteFolder = document.getElementById('ctx-delete-folder');
@@ -38,6 +40,9 @@ const quitBtn = document.getElementById('quit-btn');
 
 // A global variable to track the currently active tab ID
 let activeTabId = null;
+
+// NEW: Global var to store the target for a new folder
+let contextMenuTargetContainer = null;
 
 // --- 2. Helper Functions ---
 
@@ -181,7 +186,11 @@ function createNewTab(url = "https://www.google.com") {
     activateTab(tabId);
 }
 
-function createNewFolder() {
+/**
+ * --- UPDATED: Creates a new folder ---
+ * @param {HTMLElement} parentElement - The container to add the folder to.
+ */
+function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
 
     // 1. Create Folder Header
@@ -212,12 +221,13 @@ function createNewFolder() {
     });
 
     // 4. Add to DOM
-    tabList.appendChild(folderItem);
-    tabList.appendChild(folderContent);
+    parentElement.appendChild(folderItem);
+    parentElement.appendChild(folderContent);
 
     // 5. Make the new folder content area sortable
     new Sortable(folderContent, {
-        group: 'shared-tabs',
+        group: 'shared-tabs', // Allow items to be dragged in/out
+        handle: '.tab-item, .folder-item', // Allow tabs AND folders to be dragged
         animation: 150,
     });
 }
@@ -239,21 +249,16 @@ function handleRenameKeys(e) {
 // --- 3. Global Event Listeners ---
 
 window.addEventListener('keydown', (event) => {
-    // "New Tab" shortcut
     if (event.ctrlKey && event.key === 't') {
-        event.preventDefault(); 
+        event.preventDefault();
         createNewTab();
     }
-    
-    // "Close Tab" shortcut
     else if (event.ctrlKey && event.key === 'w') {
-        event.preventDefault(); 
+        event.preventDefault();
         if (activeTabId) {
             closeTab(activeTabId);
         }
     }
-
-    // "Toggle Sidebar" shortcut
     else if (event.ctrlKey && event.key === 's') {
         event.preventDefault();
         sidebar.classList.toggle('hidden');
@@ -319,19 +324,25 @@ function initResizer() {
     });
 }
 
+/**
+ * --- UPDATED: Initializes all sortable lists ---
+ */
 function initSortable() {
+    // Make the main tab-list sortable
     new Sortable(tabList, {
-        group: 'shared-tabs',
+        group: 'shared-tabs', // All lists with this name can share items
+        handle: '.tab-item, .folder-item', // Allow tabs AND folders to be dragged
+        filter: '.folder-content', // Don't let the folder content be dragged
         animation: 150,
-        filter: '.folder-content',
-        handle: '.tab-item'
     });
 }
+
 
 // --- 4. Initialization ---
 createNewTab();
 initResizer();
 initSortable();
+
 
 // --- 5. Theme Logic ---
 
@@ -364,37 +375,62 @@ if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').match
     colorPicker.value = '#e9ebee';
 }
 
-// --- 6. Context Menu Logic ---
+// --- 6. Context Menu Logic (UPDATED) ---
 
+// Hide menu on any left-click
 window.addEventListener('click', () => {
     contextMenu.style.display = 'none';
 });
 
+// Main context menu listener for the sidebar
+// Main context menu listener for the sidebar
 sidebar.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 
     const clickedFolder = e.target.closest('.folder-item');
+    
+    // Always show the "New Folder" (root) button
+    ctxAddFolder.style.display = 'block';
 
-    ctxAddFolder.style.display = 'none';
+    // Hide folder-specific buttons by default
+    ctxAddNestedFolder.style.display = 'none';
     ctxRenameFolder.style.display = 'none';
     ctxDeleteFolder.style.display = 'none';
 
     if (clickedFolder) {
+        // We right-clicked *on* a folder header
+        ctxAddNestedFolder.style.display = 'block'; // Show nested folder button
         ctxRenameFolder.style.display = 'block';
         ctxDeleteFolder.style.display = 'block';
+        
+        // Store which folder we clicked for all folder actions
         contextMenu.dataset.targetId = clickedFolder.dataset.id;
     } else {
-        ctxAddFolder.style.display = 'block';
-        contextMenu.dataset.targetId = '';
+        // We right-clicked on empty space, a tab, or inside a folder's content
+        contextMenu.dataset.targetId = ''; // Clear folder-action target
     }
 
+    // Position and show the menu
     contextMenu.style.top = `${e.clientY}px`;
     contextMenu.style.left = `${e.clientX}px`;
     contextMenu.style.display = 'block';
 });
 
+// --- Context Menu Button Listeners (UPDATED) ---
+
 ctxAddFolder.addEventListener('click', () => {
-    createNewFolder();
+    // This button *always* creates a folder in the root tabList
+    createNewFolder(tabList);
+    contextMenu.style.display = 'none';
+});
+
+ctxAddNestedFolder.addEventListener('click', () => {
+    const folderId = contextMenu.dataset.targetId;
+    const folderContent = document.getElementById(folderId); // This is the .folder-content div
+    
+    if (folderContent) {
+        createNewFolder(folderContent); // Create the new folder *inside* the one we clicked
+    }
     contextMenu.style.display = 'none';
 });
 
@@ -421,11 +457,16 @@ ctxDeleteFolder.addEventListener('click', () => {
     const folderContent = document.getElementById(folderId);
 
     if (folderHeader && folderContent) {
-        const tabsInFolder = folderContent.querySelectorAll('.tab-item');
-        tabsInFolder.forEach(tab => {
-            tabList.appendChild(tab);
-        });
+        // Find the parent container (where to move items to)
+        const parentContainer = folderHeader.parentElement;
+
+        // Move all children (tabs, folders, etc.) up one level
+        while (folderContent.firstChild) {
+            // Insert each item before the folder header we're about to delete
+            parentContainer.insertBefore(folderContent.firstChild, folderHeader);
+        }
         
+        // Now, delete the empty folder
         folderHeader.remove();
         folderContent.remove();
     }
@@ -444,7 +485,7 @@ toggleFullscreenBtn.addEventListener('click', () => {
 });
 
 toggleDevtoolsBtn.addEventListener('click', () => {
-    ipcRenderer.send('toggle-devtools'); // <-- THIS IS THE FIXED LINE
+    ipcRenderer.send('toggle-devtools');
 });
 
 quitBtn.addEventListener('click', () => {

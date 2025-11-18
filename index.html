@@ -49,25 +49,21 @@
             display: flex; flex-direction: row; height: 100vh;
         }
 
-        /* --- Sidebar Styles (UPDATED) --- */
+        /* --- Sidebar Styles --- */
         #sidebar {
-            display: flex;
-            flex-direction: column;
-            flex-basis: 280px; /* Default width */
+            display: flex; flex-direction: column;
+            flex-basis: 280px;
             flex-shrink: 0; 
             flex-grow: 0;   
             min-width: 200px; 
             max-width: 600px; 
             background-color: var(--bg-sidebar);
             border-right: 1px solid var(--border-color);
-            overflow: hidden; /* Hide content when shrinking */
-            
-            /* UPDATED: Added min-width to the transition */
+            overflow: hidden;
             transition: flex-basis 0.3s ease-in-out, min-width 0.3s ease-in-out, border-right 0.3s ease-in-out;
         }
-
         #sidebar-controls {
-            padding: 12px;
+            padding: 8px 12px;
             border-bottom: 1px solid var(--border-color);
         }
 
@@ -94,7 +90,7 @@
             color: var(--text-primary);
             border-radius: 8px;
             box-sizing: border-box; outline: none;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
         }
         #url-bar:focus {
             border-color: var(--text-accent);
@@ -113,13 +109,14 @@
         .tab-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 10px 12px;
-            margin: 0 8px 4px 8px;
-            width: calc(100% - 38px);
+            margin: 0 8px 4px 8px; /* 19px on each side = 38px total */
+            width: calc(100% - 38px); /* Fit with new gaps */
             border-radius: 6px; border: none; 
             background-color: transparent;
             text-align: left; 
             color: var(--text-secondary);
         }
+
         .tab-item:hover {
             background-color: var(--bg-hover);
         }
@@ -154,7 +151,8 @@
             display: flex;
             align-items: center;
             padding: 10px 12px;
-            margin: 4px 8px;
+            margin: 4px 8px; /* 19px on each side = 38px total */
+            width: calc(100% - 38px); /* Match tab width */
             border-radius: 6px;
             background-color: var(--bg-hover);
             cursor: pointer;
@@ -180,10 +178,12 @@
             border-radius: 3px;
         }
 
+        /* --- Folder Content (UPDATED) --- */
         .folder-content {
             padding-top: 4px;
+            /* This margin indents all nested items */
+            margin-left: 20px; 
             border-left: 2px solid var(--border-color);
-            margin-left: 18px;
         }
         .folder-item.collapsed + .folder-content {
             display: none;
@@ -194,13 +194,12 @@
             padding: 12px;
             border-top: 1px solid var(--border-color);
             background-color: var(--bg-btn-secondary);
-            display: none; /* <-- HIDDEN BY DEFAULT */
+            display: none;
         }
         
         #theme-controls.visible {
             display: block;
         }
-
         #color-picker-wrapper {
             display: flex;
             align-items: center;
@@ -228,7 +227,6 @@
             border: none;
             border-radius: 3px;
         }
-
         .theme-button {
             width: 100%;
             padding: 8px;
@@ -243,19 +241,18 @@
         .theme-button:hover {
             background-color: var(--bg-hover);
         }
-        
         .settings-separator {
             height: 1px;
             background-color: var(--border-color);
             margin: 10px 0;
         }
 
-        /* --- Resizer Handle Style (UPDATED) --- */
+        /* --- Resizer Handle Style --- */
         #resizer {
             width: 4px;
             background: transparent; 
             cursor: col-resize;
-            transition: background-color 0.2s ease, width 0.3s ease-in-out; /* Added width transition */
+            transition: background-color 0.2s ease, width 0.3s ease-in-out;
         }
         #resizer:hover,
         #resizer.is-resizing {
@@ -361,15 +358,15 @@
             filter: var(--text-accent) drop-shadow(0 0 0);
         }
 
-        /* --- NEW: Sidebar Toggle Styles (UPDATED) --- */
+        /* --- Sidebar Toggle Styles --- */
         #sidebar.hidden {
-            flex-basis: 0 !important; /* Forces width to 0 */
+            flex-basis: 0 !important;
             min-width: 0 !important;
-            border-right: none; /* Hides border when collapsed */
+            border-right: none;
         }
         #resizer.hidden {
-            width: 0 !important; /* Hides resizer */
-            pointer-events: none; /* Make it unclickable */
+            width: 0 !important;
+            pointer-events: none;
         }
         
     </style>
@@ -413,7 +410,9 @@
                 </button>
             </div>
 
-        </div> <div id="resizer"></div>
+        </div> 
+
+        <div id="resizer"></div>
 
         <div id="webview-container">
             </div>
@@ -422,6 +421,7 @@
 
     <div id="context-menu">
         <button id="ctx-add-folder" class="context-menu-btn">New Folder</button>
+        <button id="ctx-add-nested-folder" class="context-menu-btn">New Nested Folder</button>
         <button id="ctx-rename-folder" class="context-menu-btn">Rename</button>
         <button id="ctx-delete-folder" class="context-menu-btn" style="color: #f00;">Delete Folder</button>
     </div>
