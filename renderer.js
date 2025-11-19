@@ -1,4 +1,4 @@
-// renderer.js - Fixed closeTab logic + all features
+// renderer.js - Clean titles (No more "- Google Search")
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
@@ -36,6 +36,10 @@ const toggleFullscreenBtn = document.getElementById('toggle-fullscreen-btn');
 const toggleDevtoolsBtn = document.getElementById('toggle-devtools-btn');
 const quitBtn = document.getElementById('quit-btn');
 
+// Spotlight Elements
+const spotlightOverlay = document.getElementById('spotlight-overlay');
+const spotlightInput = document.getElementById('spotlight-input');
+
 
 // A global variable to track the currently active tab ID
 let activeTabId = null;
@@ -50,51 +54,58 @@ function getActiveWebview() {
 }
 
 /**
- * FIXED: Robustly closes tabs, even if they are the last one.
+ * Determines if input is a URL or a Search Query
  */
+function processUrl(input) {
+    if (input.includes(' ')) {
+        return 'https://www.google.com/search?q=' + encodeURIComponent(input);
+    }
+    const domainRegex = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
+    if (domainRegex.test(input) || input.startsWith('localhost') || input.includes('://')) {
+        if (!input.startsWith('http://') && !input.startsWith('https://') && !input.startsWith('file://')) {
+            return 'https://' + input;
+        }
+        return input;
+    }
+    return 'https://www.google.com/search?q=' + encodeURIComponent(input);
+}
+
 function closeTab(tabId) {
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
 
     if (!tabButton || !webview) return;
 
-    // 1. Determine the next tab to activate using the List method (not sibling method)
     let nextTabId = null;
     if (activeTabId === tabId) {
-        // Get a clean list of all currently visible tabs
         const allTabs = Array.from(document.querySelectorAll('.tab-item'));
         const currentIndex = allTabs.findIndex(tab => tab.dataset.id === tabId);
 
         if (currentIndex !== -1) {
-            // Try to go to the next tab
             if (currentIndex < allTabs.length - 1) {
                 nextTabId = allTabs[currentIndex + 1].dataset.id;
             } 
-            // If we are at the end, go to the previous tab
             else if (currentIndex > 0) {
                 nextTabId = allTabs[currentIndex - 1].dataset.id;
             }
         }
     }
 
-    // 2. Switch active tab immediately
     if (nextTabId) {
         activateTab(nextTabId);
     }
 
-    // 3. Start the Exit Animation
     tabButton.classList.add('closing');
 
-    // 4. Wait for animation to finish, then delete
     setTimeout(() => {
         tabButton.remove();
         webview.remove();
 
-        // Edge case: If we closed the very last tab in the browser
         const remainingTabs = document.querySelectorAll('.tab-item');
-        if (remainingTabs.length < 1) {
-            createNewTab();
-        } 
+        if (remainingTabs.length === 0) {
+             activeTabId = null;
+             urlBar.value = ''; 
+        }
     }, 200); 
 }
 
@@ -109,7 +120,6 @@ function activateTab(tabId) {
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
     
-    // Guard clause: If tab/webview was just closed, it might not exist
     if (!tabButton || !webview) return;
 
     tabButton.classList.add('active');
@@ -163,13 +173,10 @@ function createNewTab(url = "https://www.google.com") {
     tabButton.appendChild(titleSpan);
     tabButton.appendChild(closeBtn);
 
-    // Add to DOM immediately so animation starts
     tabList.appendChild(tabButton);
-    
-    // Scroll to bottom
     tabList.scrollTop = tabList.scrollHeight;
 
-    // --- PART 2: Create the Webview (Delayed for animation smoothness) ---
+    // --- PART 2: Create the Webview ---
     setTimeout(() => {
         const webview = document.createElement('webview');
         webview.className = 'webview-item';
@@ -192,7 +199,11 @@ function createNewTab(url = "https://www.google.com") {
                 reloadBtn.innerHTML = '&#x21bb;';
             }
             
-            titleSpan.textContent = webview.getTitle().substring(0, 25) || "New Tab";
+            // --- THIS IS THE FIX ---
+            // Get title, remove "- Google Search", then truncate
+            let cleanTitle = webview.getTitle().replace(' - Google Search', '');
+            titleSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
+            // -----------------------
         });
 
         webview.addEventListener('did-navigate', (event) => {
@@ -207,9 +218,6 @@ function createNewTab(url = "https://www.google.com") {
     }, 50);
 }
 
-/**
- * Creates a new folder
- */
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
 
@@ -266,12 +274,45 @@ function handleRenameKeys(e) {
     }
 }
 
+// --- Spotlight Logic ---
+function toggleSpotlight() {
+    const isVisible = spotlightOverlay.classList.contains('visible');
+    
+    if (isVisible) {
+        spotlightOverlay.classList.remove('visible');
+    } else {
+        spotlightOverlay.classList.add('visible');
+        spotlightInput.value = ''; 
+        spotlightInput.focus();
+    }
+}
+
+spotlightOverlay.addEventListener('click', (e) => {
+    if (e.target === spotlightOverlay) {
+        toggleSpotlight();
+    }
+});
+
+spotlightInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        let input = spotlightInput.value;
+        if (input) {
+            let validUrl = processUrl(input);
+            createNewTab(validUrl); 
+            toggleSpotlight(); 
+        }
+    } else if (e.key === 'Escape') {
+        toggleSpotlight();
+    }
+});
+
+
 // --- 3. Global Event Listeners ---
 
 window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.key === 't') {
         event.preventDefault();
-        createNewTab();
+        toggleSpotlight(); 
     }
     else if (event.ctrlKey && event.key === 'w') {
         event.preventDefault();
@@ -284,23 +325,31 @@ window.addEventListener('keydown', (event) => {
         sidebar.classList.toggle('hidden');
         resizer.classList.toggle('hidden');
     }
+    else if (event.key === 'Escape' && spotlightOverlay.classList.contains('visible')) {
+        toggleSpotlight();
+    }
 });
 
+// Sidebar URL Bar Listener
 urlBar.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
-        let url = urlBar.value;
-        if (!url.startsWith('http://') && !url.startsWith('https://')) {
-            url = 'https://' + url;
+        let input = urlBar.value;
+        let validUrl = processUrl(input);
+        
+        const activeWebview = getActiveWebview();
+        if (activeWebview) {
+            activeWebview.loadURL(validUrl);
+        } else {
+            createNewTab(validUrl);
         }
-        getActiveWebview().loadURL(url);
     }
 });
 
 backBtn.addEventListener('click', () => {
-    getActiveWebview().goBack();
+    getActiveWebview()?.goBack();
 });
 forwardBtn.addEventListener('click', () => {
-    getActiveWebview().goForward();
+    getActiveWebview()?.goForward();
 });
 reloadBtn.addEventListener('click', () => { 
     const activeWebview = getActiveWebview();
@@ -354,7 +403,6 @@ function initSortable() {
 }
 
 // --- 4. Initialization ---
-createNewTab();
 initResizer();
 initSortable();
 
@@ -414,7 +462,6 @@ sidebar.addEventListener('contextmenu', (e) => {
         contextMenu.dataset.targetId = '';
     }
     
-    // Determine where a "New Folder" (root) or "Nested" should go
     contextMenuTargetContainer = e.target.closest('.folder-content') || tabList;
 
     contextMenu.style.top = `${e.clientY}px`;
@@ -423,7 +470,6 @@ sidebar.addEventListener('contextmenu', (e) => {
 });
 
 ctxAddFolder.addEventListener('click', () => {
-    // Always add to root
     createNewFolder(tabList);
     contextMenu.style.display = 'none';
 });
@@ -431,7 +477,6 @@ ctxAddFolder.addEventListener('click', () => {
 ctxAddNestedFolder.addEventListener('click', () => {
     const folderId = contextMenu.dataset.targetId;
     const folderContent = document.getElementById(folderId);
-    
     if (folderContent) {
         createNewFolder(folderContent);
     }

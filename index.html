@@ -102,21 +102,21 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 8px 0; /* Vertical padding only */
+            padding: 8px 0;
         }
 
         /* --- Tab Item Styles --- */
         .tab-item {
             display: flex; align-items: center; justify-content: space-between;
             padding: 10px 12px;
-            margin: 0 8px 4px 8px; /* 19px on each side = 38px total */
-            width: calc(100% - 38px); /* Fit with new gaps */
+            margin: 0 8px 4px 8px;
+            width: calc(100% - 38px);
             border-radius: 6px; border: none; 
             background-color: transparent;
             text-align: left; 
             color: var(--text-secondary);
+            animation: tabEnter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
         }
-
         .tab-item:hover {
             background-color: var(--bg-hover);
         }
@@ -151,8 +151,8 @@
             display: flex;
             align-items: center;
             padding: 10px 12px;
-            margin: 4px 8px; /* 19px on each side = 38px total */
-            width: calc(100% - 38px); /* Match tab width */
+            margin: 4px 8px;
+            width: calc(100% - 38px);
             border-radius: 6px;
             background-color: var(--bg-hover);
             cursor: pointer;
@@ -177,12 +177,9 @@
             margin: -2px -4px;
             border-radius: 3px;
         }
-
-        /* --- Folder Content (UPDATED) --- */
         .folder-content {
             padding-top: 4px;
-            /* This margin indents all nested items */
-            margin-left: 20px; 
+            margin-left: 27px; 
             border-left: 2px solid var(--border-color);
         }
         .folder-item.collapsed + .folder-content {
@@ -196,7 +193,6 @@
             background-color: var(--bg-btn-secondary);
             display: none;
         }
-        
         #theme-controls.visible {
             display: block;
         }
@@ -259,22 +255,45 @@
             background: var(--text-accent); 
         }
 
-        /* --- Custom Scrollbar --- */
-        #tab-list::-webkit-scrollbar {
-            width: 8px;
+        /* --- Sidebar Footer Styles --- */
+        #sidebar-footer {
+            padding: 4px 12px;
+            border-top: 1px solid var(--border-color);
         }
-        #tab-list::-webkit-scrollbar-track {
-            background: transparent;
+        #settings-btn {
+            background: none;
+            border: none;
+            padding: 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            line-height: 0; 
         }
-        #tab-list::-webkit-scrollbar-thumb {
-            background: transparent;
-            border-radius: 4px;
+        #settings-btn img {
+            width: 20px;
+            height: 20px;
+            filter: var(--text-primary) drop-shadow(0 0 0); 
+            opacity: 0.7;
         }
-        #tab-list:hover::-webkit-scrollbar-thumb {
-            background: var(--text-secondary);
+        #settings-btn:hover {
+            background-color: var(--bg-hover);
         }
-        #tab-list::-webkit-scrollbar-thumb:hover {
-            background: var(--text-accent);
+        #settings-btn:hover img {
+            opacity: 1;
+        }
+        #settings-btn.active img {
+            opacity: 1;
+            filter: var(--text-accent) drop-shadow(0 0 0);
+        }
+
+        /* --- Sidebar Toggle Styles --- */
+        #sidebar.hidden {
+            flex-basis: 0 !important;
+            min-width: 0 !important;
+            border-right: none;
+        }
+        #resizer.hidden {
+            width: 0 !important;
+            pointer-events: none;
         }
 
         /* --- Webview Area --- */
@@ -319,100 +338,76 @@
             background-color: var(--bg-hover);
             color: var(--text-accent);
         }
-        .context-menu-separator {
-            height: 1px;
-            background-color: var(--border-color);
-            margin: 4px 0;
-        }
         .context-menu-btn {
             display: none;
         }
-        
-        /* --- Sidebar Footer Styles --- */
-        #sidebar-footer {
-            padding: 4px 12px;
-            border-top: 1px solid var(--border-color);
-        }
-        #settings-btn {
-            background: none;
-            border: none;
-            padding: 6px;
-            border-radius: 6px;
-            cursor: pointer;
-            line-height: 0; 
-        }
-        #settings-btn img {
-            width: 20px;
-            height: 20px;
-            filter: var(--text-primary) drop-shadow(0 0 0); 
-            opacity: 0.7;
-        }
-        #settings-btn:hover {
-            background-color: var(--bg-hover);
-        }
-        #settings-btn:hover img {
-            opacity: 1;
-        }
-        #settings-btn.active img {
-            opacity: 1;
-            filter: var(--text-accent) drop-shadow(0 0 0);
-        }
 
-        /* --- Sidebar Toggle Styles --- */
-        #sidebar.hidden {
-            flex-basis: 0 !important;
-            min-width: 0 !important;
-            border-right: none;
-        }
-        #resizer.hidden {
-            width: 0 !important;
-            pointer-events: none;
-        }
-        /* --- NEW: Tab Animations --- */
+        /* --- Tab Animations --- */
         @keyframes tabEnter {
-            from { 
-                opacity: 0; 
-                transform: translateY(10px) scale(0.95); 
-            }
-            to { 
-                opacity: 1; 
-                transform: translateY(0) scale(1); 
-            }
+            from { opacity: 0; transform: translateY(10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        
         @keyframes tabExit {
-            to { 
-                opacity: 0; 
-                transform: scale(0.9); 
-                /* Shrink space to 0 to let other tabs slide up */
-                margin-top: 0; 
-                margin-bottom: 0; 
-                height: 0; 
-                padding-top: 0; 
-                padding-bottom: 0; 
-            }
+            to { opacity: 0; transform: scale(0.9); margin-top: 0; margin-bottom: 0; height: 0; padding-top: 0; padding-bottom: 0; }
         }
-
-        /* Add animation to base class for Entry */
-        .tab-item {
-            /* ... existing styles ... */
-            /* Add this line: */
-            animation: tabEnter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
-        }
-
-        /* Class for Exit */
         .tab-item.closing {
             animation: tabExit 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-            pointer-events: none; /* Prevent clicking while closing */
+            pointer-events: none;
         }
 
+        /* --- NEW: Spotlight Search Styles --- */
+        #spotlight-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4); /* Dim background */
+            backdrop-filter: blur(5px); /* Glass effect */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align top-center */
+            padding-top: 15vh; /* Push down from top */
+            z-index: 2000;
+            opacity: 0;
+            pointer-events: none; /* Click through when hidden */
+            transition: opacity 0.2s ease;
+        }
+        #spotlight-overlay.visible {
+            opacity: 1;
+            pointer-events: auto; /* Enable clicking */
+        }
+        
+        #spotlight-bar {
+            width: 600px;
+            max-width: 90%;
+            background-color: var(--bg-btn-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            padding: 15px;
+            transform: translateY(-20px);
+            transition: transform 0.2s ease;
+        }
+        #spotlight-overlay.visible #spotlight-bar {
+            transform: translateY(0);
+        }
+
+        #spotlight-input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-size: 20px;
+            color: var(--text-primary);
+            outline: none;
+        }
+        
     </style>
 </head>
 <body>
     <div id="app-container">
 
         <div id="sidebar">
-            
             <div id="sidebar-controls">
                 <input type="text" id="url-bar" placeholder="https://">
                 <div id="nav-buttons">
@@ -422,8 +417,7 @@
                 </div>
             </div>
             
-            <div id="tab-list">
-                </div>
+            <div id="tab-list"></div>
 
             <div id="theme-controls">
                 <div id="color-picker-wrapper">
@@ -432,13 +426,11 @@
                 </div>
                 <button id="dark-mode-toggle-btn" class="theme-button">Toggle Dark Mode</button>
                 <button id="reset-color-btn" class="theme-button">Reset Color</button>
-                
                 <div class="settings-separator"></div>
                 <button id="toggle-fullscreen-btn" class="theme-button">Toggle Fullscreen</button>
                 <button id="toggle-devtools-btn" class="theme-button">Toggle DevTools</button>
                 <div class="settings-separator"></div>
                 <button id="quit-btn" class="theme-button" style="color: #f00;">Quit Sol Browser</button>
-
             </div>
             
             <div id="sidebar-footer">
@@ -446,14 +438,11 @@
                     <img src="./assets/settings.svg" alt="Settings">
                 </button>
             </div>
-
         </div> 
 
         <div id="resizer"></div>
 
-        <div id="webview-container">
-            </div>
-
+        <div id="webview-container"></div>
     </div>
 
     <div id="context-menu">
@@ -463,7 +452,12 @@
         <button id="ctx-delete-folder" class="context-menu-btn" style="color: #f00;">Delete Folder</button>
     </div>
 
-    <script src="./renderer.js"></script>
+    <div id="spotlight-overlay">
+        <div id="spotlight-bar">
+            <input type="text" id="spotlight-input" placeholder="Search or enter URL..." autocomplete="off">
+        </div>
+    </div>
 
+    <script src="./renderer.js"></script>
 </body>
 </html>
