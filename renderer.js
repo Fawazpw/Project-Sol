@@ -1,4 +1,4 @@
-// renderer.js - Clean titles (No more "- Google Search")
+// renderer.js - Fixed "One Tab" closing issue
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
@@ -6,19 +6,19 @@ const { ipcRenderer } = require('electron');
 // --- 1. Get elements from the DOM ---
 const sidebar = document.getElementById('sidebar');
 const resizer = document.getElementById('resizer');
-
 const urlBar = document.getElementById('url-bar');
 const backBtn = document.getElementById('back-btn');
 const forwardBtn = document.getElementById('forward-btn');
 const reloadBtn = document.getElementById('reload-btn');
-
 const tabList = document.getElementById('tab-list');
 const webviewContainer = document.getElementById('webview-container');
 
-// Get theme control elements
+// Theme elements
 const darkModeToggleBtn = document.getElementById('dark-mode-toggle-btn');
 const colorPicker = document.getElementById('sidebar-color-picker');
 const resetColorBtn = document.getElementById('reset-color-btn');
+const settingsBtn = document.getElementById('settings-btn');
+const themeControls = document.getElementById('theme-controls');
 
 // Context Menu elements
 const contextMenu = document.getElementById('context-menu');
@@ -26,10 +26,6 @@ const ctxAddFolder = document.getElementById('ctx-add-folder');
 const ctxAddNestedFolder = document.getElementById('ctx-add-nested-folder');
 const ctxRenameFolder = document.getElementById('ctx-rename-folder');
 const ctxDeleteFolder = document.getElementById('ctx-delete-folder');
-
-// Settings Toggle Elements
-const settingsBtn = document.getElementById('settings-btn');
-const themeControls = document.getElementById('theme-controls');
 
 // Menu buttons
 const toggleFullscreenBtn = document.getElementById('toggle-fullscreen-btn');
@@ -40,11 +36,7 @@ const quitBtn = document.getElementById('quit-btn');
 const spotlightOverlay = document.getElementById('spotlight-overlay');
 const spotlightInput = document.getElementById('spotlight-input');
 
-
-// A global variable to track the currently active tab ID
 let activeTabId = null;
-
-// Global var to store the target for a new folder
 let contextMenuTargetContainer = null;
 
 // --- 2. Helper Functions ---
@@ -53,9 +45,6 @@ function getActiveWebview() {
     return document.querySelector(`.webview-item.active`);
 }
 
-/**
- * Determines if input is a URL or a Search Query
- */
 function processUrl(input) {
     if (input.includes(' ')) {
         return 'https://www.google.com/search?q=' + encodeURIComponent(input);
@@ -70,33 +59,54 @@ function processUrl(input) {
     return 'https://www.google.com/search?q=' + encodeURIComponent(input);
 }
 
+/**
+ * FIXED: closes the specific tab, or the active one if no ID provided
+ */
 function closeTab(tabId) {
+    // 1. If no ID passed, find the currently active tab from the DOM
+    if (!tabId) {
+        const activeItem = document.querySelector('.tab-item.active');
+        if (activeItem) {
+            tabId = activeItem.dataset.id;
+        } else {
+            return; // No tabs to close
+        }
+    }
+
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
 
     if (!tabButton || !webview) return;
 
+    // 2. Determine the next tab to activate
     let nextTabId = null;
-    if (activeTabId === tabId) {
+    
+    // Only look for a new tab if we are closing the one that is currently active
+    if (tabButton.classList.contains('active')) {
         const allTabs = Array.from(document.querySelectorAll('.tab-item'));
         const currentIndex = allTabs.findIndex(tab => tab.dataset.id === tabId);
 
-        if (currentIndex !== -1) {
+        if (currentIndex !== -1 && allTabs.length > 1) {
+            // Try to go to the next tab
             if (currentIndex < allTabs.length - 1) {
                 nextTabId = allTabs[currentIndex + 1].dataset.id;
             } 
+            // If we are at the end, go to the previous tab
             else if (currentIndex > 0) {
                 nextTabId = allTabs[currentIndex - 1].dataset.id;
             }
         }
     }
 
+    // 3. Switch active tab immediately
     if (nextTabId) {
         activateTab(nextTabId);
     }
 
+    // 4. Start the Exit Animation
     tabButton.classList.add('closing');
 
+    // 5. Wait for animation to finish, then delete
     setTimeout(() => {
         tabButton.remove();
         webview.remove();
@@ -110,12 +120,8 @@ function closeTab(tabId) {
 }
 
 function activateTab(tabId) {
-    document.querySelectorAll('.tab-item.active').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelectorAll('.webview-item.active').forEach(view => {
-        view.classList.remove('active');
-    });
+    document.querySelectorAll('.tab-item.active').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.webview-item.active').forEach(view => view.classList.remove('active'));
 
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
@@ -126,8 +132,7 @@ function activateTab(tabId) {
     webview.classList.add('active');
 
     if (typeof webview.getURL === 'function') {
-        const url = webview.getURL();
-        urlBar.value = url;
+        urlBar.value = webview.getURL();
         backBtn.disabled = !webview.canGoBack();
         forwardBtn.disabled = !webview.canGoForward();
     } else {
@@ -135,15 +140,11 @@ function activateTab(tabId) {
         backBtn.disabled = true;
         forwardBtn.disabled = true;
     }
-
     activeTabId = tabId;
 }
 
-
 function createNewTab(url = "https://www.google.com") {
     const tabId = "tab-" + Date.now(); 
-
-    // 1. Create the tab button
     const tabButton = document.createElement('div');
     tabButton.className = 'tab-item';
     tabButton.setAttribute('data-id', tabId);
@@ -156,38 +157,23 @@ function createNewTab(url = "https://www.google.com") {
     closeBtn.className = 'tab-close-btn';
     closeBtn.innerHTML = '&#10005;';
 
-    // --- Add Listeners ---
-    titleSpan.addEventListener('click', () => {
-        activateTab(tabId);
-    });
-    tabButton.addEventListener('click', (e) => {
-        if (e.target === tabButton) {
-            activateTab(tabId);
-        }
-    });
-    closeBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); 
-        closeTab(tabId);
-    });
+    titleSpan.addEventListener('click', () => activateTab(tabId));
+    tabButton.addEventListener('click', (e) => { if (e.target === tabButton) activateTab(tabId); });
+    closeBtn.addEventListener('click', (e) => { e.stopPropagation(); closeTab(tabId); });
 
     tabButton.appendChild(titleSpan);
     tabButton.appendChild(closeBtn);
-
     tabList.appendChild(tabButton);
     tabList.scrollTop = tabList.scrollHeight;
 
-    // --- PART 2: Create the Webview ---
     setTimeout(() => {
         const webview = document.createElement('webview');
         webview.className = 'webview-item';
         webview.setAttribute('data-id', tabId);
         webview.src = url;
 
-        // Add webview event listeners
         webview.addEventListener('did-start-loading', () => {
-            if (webview.getAttribute('data-id') === activeTabId) {
-                reloadBtn.innerHTML = '&#10005;';
-            }
+            if (webview.getAttribute('data-id') === activeTabId) reloadBtn.innerHTML = '&#10005;';
         });
 
         webview.addEventListener('did-stop-loading', () => {
@@ -198,30 +184,21 @@ function createNewTab(url = "https://www.google.com") {
                 forwardBtn.disabled = !webview.canGoForward();
                 reloadBtn.innerHTML = '&#x21bb;';
             }
-            
-            // --- THIS IS THE FIX ---
-            // Get title, remove "- Google Search", then truncate
             let cleanTitle = webview.getTitle().replace(' - Google Search', '');
             titleSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
-            // -----------------------
         });
 
         webview.addEventListener('did-navigate', (event) => {
-            if (webview.getAttribute('data-id') === activeTabId) {
-                urlBar.value = event.url;
-            }
+            if (webview.getAttribute('data-id') === activeTabId) urlBar.value = event.url;
         });
 
         webviewContainer.appendChild(webview);
         activateTab(tabId);
-        
     }, 50);
 }
 
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
-
-    // 1. Create Folder Header
     const folderItem = document.createElement('div');
     folderItem.className = 'folder-item';
     folderItem.setAttribute('data-id', folderId);
@@ -237,22 +214,18 @@ function createNewFolder(parentElement) {
     folderItem.appendChild(toggle);
     folderItem.appendChild(title);
 
-    // 2. Create Folder Content (the drop zone)
     const folderContent = document.createElement('div');
     folderContent.className = 'folder-content';
     folderContent.id = folderId;
 
-    // 3. Add Collapse/Expand listener
     folderItem.addEventListener('click', (e) => {
         if (e.target.className === 'folder-title') return;
         folderItem.classList.toggle('collapsed');
     });
 
-    // 4. Add to DOM
     parentElement.appendChild(folderItem);
     parentElement.appendChild(folderContent);
 
-    // 5. Make the new folder content area sortable
     new Sortable(folderContent, {
         group: 'shared-tabs',
         handle: '.tab-item, .folder-item',
@@ -266,7 +239,6 @@ function stopEditingFolderTitle(titleElement) {
     titleElement.removeEventListener('keydown', handleRenameKeys);
     window.getSelection().removeAllRanges();
 }
-
 function handleRenameKeys(e) {
     if (e.key === 'Enter' || e.key === 'Escape') {
         e.preventDefault();
@@ -274,10 +246,8 @@ function handleRenameKeys(e) {
     }
 }
 
-// --- Spotlight Logic ---
 function toggleSpotlight() {
     const isVisible = spotlightOverlay.classList.contains('visible');
-    
     if (isVisible) {
         spotlightOverlay.classList.remove('visible');
     } else {
@@ -287,11 +257,7 @@ function toggleSpotlight() {
     }
 }
 
-spotlightOverlay.addEventListener('click', (e) => {
-    if (e.target === spotlightOverlay) {
-        toggleSpotlight();
-    }
-});
+spotlightOverlay.addEventListener('click', (e) => { if (e.target === spotlightOverlay) toggleSpotlight(); });
 
 spotlightInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -301,14 +267,23 @@ spotlightInput.addEventListener('keydown', (e) => {
             createNewTab(validUrl); 
             toggleSpotlight(); 
         }
-    } else if (e.key === 'Escape') {
-        toggleSpotlight();
-    }
+    } else if (e.key === 'Escape') toggleSpotlight();
 });
 
+// --- 3. Event Listeners ---
 
-// --- 3. Global Event Listeners ---
+// Handle shortcuts from the Main Process (when focus is in webview)
+ipcRenderer.on('shortcut-new-tab', () => toggleSpotlight());
 
+// REMOVED check for activeTabId here, relying on closeTab internal check
+ipcRenderer.on('shortcut-close-tab', () => closeTab()); 
+
+ipcRenderer.on('shortcut-toggle-sidebar', () => {
+    sidebar.classList.toggle('hidden');
+    resizer.classList.toggle('hidden');
+});
+
+// Handle shortcuts locally (when focus is in sidebar/spotlight)
 window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.key === 't') {
         event.preventDefault();
@@ -316,9 +291,7 @@ window.addEventListener('keydown', (event) => {
     }
     else if (event.ctrlKey && event.key === 'w') {
         event.preventDefault();
-        if (activeTabId) {
-            closeTab(activeTabId);
-        }
+        closeTab(); // Call without ID, let function find active tab
     }
     else if (event.ctrlKey && event.key === 's') {
         event.preventDefault();
@@ -330,7 +303,6 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
-// Sidebar URL Bar Listener
 urlBar.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         let input = urlBar.value;
@@ -345,28 +317,18 @@ urlBar.addEventListener('keydown', (event) => {
     }
 });
 
-backBtn.addEventListener('click', () => {
-    getActiveWebview()?.goBack();
-});
-forwardBtn.addEventListener('click', () => {
-    getActiveWebview()?.goForward();
-});
+backBtn.addEventListener('click', () => getActiveWebview()?.goBack());
+forwardBtn.addEventListener('click', () => getActiveWebview()?.goForward());
 reloadBtn.addEventListener('click', () => { 
     const activeWebview = getActiveWebview();
     if (!activeWebview) return;
-    
-    if (reloadBtn.innerHTML.includes('✕')) {
-        activeWebview.stop();
-    } else {
-        activeWebview.reload();
-    }
+    if (reloadBtn.innerHTML.includes('✕')) activeWebview.stop();
+    else activeWebview.reload();
 });
 
-// --- Resizer Logic ---
 function initResizer() {
     let initialX = 0;
     let initialWidth = 0;
-
     const handleMouseMove = (e) => {
         const deltaX = e.clientX - initialX;
         let newWidth = initialWidth + deltaX;
@@ -376,13 +338,11 @@ function initResizer() {
         if (newWidth > maxWidth) newWidth = maxWidth;
         sidebar.style.flexBasis = `${newWidth}px`;
     };
-
     const handleMouseUp = () => {
         resizer.classList.remove('is-resizing');
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
     };
-
     resizer.addEventListener('mousedown', (e) => {
         e.preventDefault();
         resizer.classList.add('is-resizing');
@@ -402,16 +362,10 @@ function initSortable() {
     });
 }
 
-// --- 4. Initialization ---
 initResizer();
 initSortable();
 
-// --- 5. Theme Logic ---
-
-colorPicker.addEventListener('input', (e) => {
-    const newColor = e.target.value;
-    document.body.style.setProperty('--bg-sidebar', newColor);
-});
+colorPicker.addEventListener('input', (e) => document.body.style.setProperty('--bg-sidebar', e.target.value));
 resetColorBtn.addEventListener('click', () => {
     document.body.style.removeProperty('--bg-sidebar');
     colorPicker.value = (document.body.dataset.theme === 'dark') ? '#252525' : '#e9ebee';
@@ -437,22 +391,14 @@ if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').match
     colorPicker.value = '#e9ebee';
 }
 
-// --- 6. Context Menu Logic ---
-
-window.addEventListener('click', () => {
-    contextMenu.style.display = 'none';
-});
-
+window.addEventListener('click', () => contextMenu.style.display = 'none');
 sidebar.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-
     const clickedFolder = e.target.closest('.folder-item');
-    
     ctxAddFolder.style.display = 'block';
     ctxAddNestedFolder.style.display = 'none';
     ctxRenameFolder.style.display = 'none';
     ctxDeleteFolder.style.display = 'none';
-
     if (clickedFolder) {
         ctxAddNestedFolder.style.display = 'block';
         ctxRenameFolder.style.display = 'block';
@@ -461,76 +407,49 @@ sidebar.addEventListener('contextmenu', (e) => {
     } else {
         contextMenu.dataset.targetId = '';
     }
-    
     contextMenuTargetContainer = e.target.closest('.folder-content') || tabList;
-
     contextMenu.style.top = `${e.clientY}px`;
     contextMenu.style.left = `${e.clientX}px`;
     contextMenu.style.display = 'block';
 });
 
-ctxAddFolder.addEventListener('click', () => {
-    createNewFolder(tabList);
-    contextMenu.style.display = 'none';
-});
-
+ctxAddFolder.addEventListener('click', () => { createNewFolder(tabList); contextMenu.style.display = 'none'; });
 ctxAddNestedFolder.addEventListener('click', () => {
     const folderId = contextMenu.dataset.targetId;
     const folderContent = document.getElementById(folderId);
-    if (folderContent) {
-        createNewFolder(folderContent);
-    }
+    if (folderContent) createNewFolder(folderContent);
     contextMenu.style.display = 'none';
 });
-
 ctxRenameFolder.addEventListener('click', () => {
     const folderId = contextMenu.dataset.targetId;
     const folderHeader = document.querySelector(`.folder-item[data-id="${folderId}"]`);
     if (folderHeader) {
         const titleElement = folderHeader.querySelector('.folder-title');
-        
         titleElement.setAttribute('contenteditable', 'true');
-        
         titleElement.addEventListener('blur', () => stopEditingFolderTitle(titleElement));
         titleElement.addEventListener('keydown', handleRenameKeys);
-
         titleElement.focus();
         document.execCommand('selectAll', false, null);
     }
     contextMenu.style.display = 'none';
 });
-
 ctxDeleteFolder.addEventListener('click', () => {
     const folderId = contextMenu.dataset.targetId;
     const folderHeader = document.querySelector(`.folder-item[data-id="${folderId}"]`);
     const folderContent = document.getElementById(folderId);
-
     if (folderHeader && folderContent) {
         const parentContainer = folderHeader.parentElement;
-        while (folderContent.firstChild) {
-            parentContainer.insertBefore(folderContent.firstChild, folderHeader);
-        }
+        while (folderContent.firstChild) parentContainer.insertBefore(folderContent.firstChild, folderHeader);
         folderHeader.remove();
         folderContent.remove();
     }
     contextMenu.style.display = 'none';
 });
 
-// --- 7. Settings Toggle Logic ---
 settingsBtn.addEventListener('click', () => {
     themeControls.classList.toggle('visible');
     settingsBtn.classList.toggle('active');
 });
-
-// --- 8. Menu Button IPC Listeners ---
-toggleFullscreenBtn.addEventListener('click', () => {
-    ipcRenderer.send('toggle-fullscreen');
-});
-
-toggleDevtoolsBtn.addEventListener('click', () => {
-    ipcRenderer.send('toggle-devtools');
-});
-
-quitBtn.addEventListener('click', () => {
-    ipcRenderer.send('quit-app');
-});
+toggleFullscreenBtn.addEventListener('click', () => ipcRenderer.send('toggle-fullscreen'));
+toggleDevtoolsBtn.addEventListener('click', () => ipcRenderer.send('toggle-devtools'));
+quitBtn.addEventListener('click', () => ipcRenderer.send('quit-app'));

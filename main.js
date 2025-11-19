@@ -1,38 +1,29 @@
-// main.js - NOW WITH A SPLASH SCREEN
+// main.js - Robust Keyboard Shortcut Handling
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 
-// Keep global references to our windows
 let mainWindow;
 let splashWindow;
 
-/**
- * Creates the new, small, frameless splash window
- */
 function createSplashWindow() {
     splashWindow = new BrowserWindow({
         width: 300,
         height: 300,
-        frame: false,       // No "File, Edit, View" bar
-        transparent: true,  // Allows for a transparent background (if your PNG is)
-        alwaysOnTop: true,  // Stays on top of other windows
+        frame: false,
+        transparent: true,
+        alwaysOnTop: true,
         center: true
     });
-    
-    // Load the new splash.html file
     splashWindow.loadFile(path.join(__dirname, 'splash.html'));
 }
 
-/**
- * Creates the main browser window (this is your old createWindow function)
- */
 function createMainWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
         icon: path.join(__dirname, 'assets/Sol Logo.png'),
-        show: false, // <-- CRITICAL: Create the window hidden
+        show: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
@@ -40,36 +31,53 @@ function createMainWindow() {
         }
     });
 
-    // Load your main index.html file
     mainWindow.loadFile('index.html');
-    
-    // Remove the default menu
     mainWindow.setMenu(null);
 
-    // --- CRITICAL: Show the main window only when it's ready ---
     mainWindow.once('ready-to-show', () => {
-        // We add a small delay to make the splash feel intentional
         setTimeout(() => {
-            if (splashWindow) {
-                splashWindow.destroy(); // Close the splash screen
-            }
-            mainWindow.show(); // Show the main window
-        }, 1500); // 1.5 second delay
+            if (splashWindow) splashWindow.destroy();
+            mainWindow.show();
+        }, 1500);
     });
 }
 
-// --- App Lifecycle ---
-
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
 app.whenReady().then(() => {
-    // Show the splash screen first
     createSplashWindow();
-    // Then create the main window in the background
     createMainWindow();
+
+    // --- ROBUST SHORTCUT HANDLER ---
+    app.on('web-contents-created', (e, contents) => {
+        // Listen to events inside webviews
+        if (contents.getType() === 'webview') {
+            contents.on('before-input-event', (event, input) => {
+                // Check for key down
+                if (input.type !== 'keyDown') return;
+
+                // Check for CTRL (Windows/Linux) or CMD (Mac)
+                const modifier = input.control || input.meta;
+
+                if (modifier) {
+                    switch (input.code) {
+                        case 'KeyT': // Ctrl + T
+                            mainWindow.webContents.send('shortcut-new-tab');
+                            event.preventDefault(); // Stop website from seeing it
+                            break;
+                        case 'KeyW': // Ctrl + W
+                            mainWindow.webContents.send('shortcut-close-tab');
+                            event.preventDefault();
+                            break;
+                        case 'KeyS': // Ctrl + S
+                            mainWindow.webContents.send('shortcut-toggle-sidebar');
+                            event.preventDefault();
+                            break;
+                    }
+                }
+            });
+        }
+    });
 });
 
-// Quit when all windows are closed
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
@@ -77,27 +85,20 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-    // On macOS, re-create a window when the dock icon is clicked
     if (BrowserWindow.getAllWindows().length === 0) {
         createMainWindow();
     }
 });
 
-// --- IPC Listeners ---
-// (Moved out of createWindow to prevent duplicate listeners)
-
+// IPC Listeners
 ipcMain.on('toggle-fullscreen', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (window) {
-        window.setFullScreen(!window.isFullScreen());
-    }
+    if (window) window.setFullScreen(!window.isFullScreen());
 });
 
 ipcMain.on('toggle-devtools', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
-    if (window) {
-        window.webContents.toggleDevTools();
-    }
+    if (window) window.webContents.toggleDevTools();
 });
 
 ipcMain.on('quit-app', () => {
