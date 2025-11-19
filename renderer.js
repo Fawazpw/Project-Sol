@@ -1,4 +1,4 @@
-// renderer.js - Now with nested folders!
+// renderer.js - Fixed closeTab logic + all features
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
@@ -15,7 +15,6 @@ const reloadBtn = document.getElementById('reload-btn');
 const tabList = document.getElementById('tab-list');
 const webviewContainer = document.getElementById('webview-container');
 
-
 // Get theme control elements
 const darkModeToggleBtn = document.getElementById('dark-mode-toggle-btn');
 const colorPicker = document.getElementById('sidebar-color-picker');
@@ -23,8 +22,8 @@ const resetColorBtn = document.getElementById('reset-color-btn');
 
 // Context Menu elements
 const contextMenu = document.getElementById('context-menu');
-const ctxAddNestedFolder = document.getElementById('ctx-add-nested-folder');
 const ctxAddFolder = document.getElementById('ctx-add-folder');
+const ctxAddNestedFolder = document.getElementById('ctx-add-nested-folder');
 const ctxRenameFolder = document.getElementById('ctx-rename-folder');
 const ctxDeleteFolder = document.getElementById('ctx-delete-folder');
 
@@ -41,7 +40,7 @@ const quitBtn = document.getElementById('quit-btn');
 // A global variable to track the currently active tab ID
 let activeTabId = null;
 
-// NEW: Global var to store the target for a new folder
+// Global var to store the target for a new folder
 let contextMenuTargetContainer = null;
 
 // --- 2. Helper Functions ---
@@ -50,37 +49,53 @@ function getActiveWebview() {
     return document.querySelector(`.webview-item.active`);
 }
 
+/**
+ * FIXED: Robustly closes tabs, even if they are the last one.
+ */
 function closeTab(tabId) {
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
 
     if (!tabButton || !webview) return;
 
+    // 1. Determine the next tab to activate using the List method (not sibling method)
     let nextTabId = null;
     if (activeTabId === tabId) {
-        const nextTab = tabButton.nextElementSibling;
-        const prevTab = tabButton.previousElementSibling;
-        
-        if (nextTab) {
-            nextTabId = nextTab.dataset.id;
-        } else if (prevTab) {
-            nextTabId = prevTab.dataset.id;
+        // Get a clean list of all currently visible tabs
+        const allTabs = Array.from(document.querySelectorAll('.tab-item'));
+        const currentIndex = allTabs.findIndex(tab => tab.dataset.id === tabId);
+
+        if (currentIndex !== -1) {
+            // Try to go to the next tab
+            if (currentIndex < allTabs.length - 1) {
+                nextTabId = allTabs[currentIndex + 1].dataset.id;
+            } 
+            // If we are at the end, go to the previous tab
+            else if (currentIndex > 0) {
+                nextTabId = allTabs[currentIndex - 1].dataset.id;
+            }
         }
     }
 
-    tabButton.remove();
-    webview.remove();
-
+    // 2. Switch active tab immediately
     if (nextTabId) {
         activateTab(nextTabId);
-    } else {
-        const remainingTabs = document.querySelectorAll('.tab-item');
-        if (remainingTabs.length === 0) {
-            createNewTab();
-        } else if (activeTabId === tabId) {
-            activateTab(remainingTabs[0].dataset.id);
-        }
     }
+
+    // 3. Start the Exit Animation
+    tabButton.classList.add('closing');
+
+    // 4. Wait for animation to finish, then delete
+    setTimeout(() => {
+        tabButton.remove();
+        webview.remove();
+
+        // Edge case: If we closed the very last tab in the browser
+        const remainingTabs = document.querySelectorAll('.tab-item');
+        if (remainingTabs.length < 1) {
+            createNewTab();
+        } 
+    }, 200); 
 }
 
 function activateTab(tabId) {
@@ -94,6 +109,7 @@ function activateTab(tabId) {
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
     
+    // Guard clause: If tab/webview was just closed, it might not exist
     if (!tabButton || !webview) return;
 
     tabButton.classList.add('active');
@@ -146,49 +162,53 @@ function createNewTab(url = "https://www.google.com") {
 
     tabButton.appendChild(titleSpan);
     tabButton.appendChild(closeBtn);
-    
-    // 2. Create the webview
-    const webview = document.createElement('webview');
-    webview.className = 'webview-item';
-    webview.setAttribute('data-id', tabId);
-    webview.src = url;
 
-    // --- 3. Add webview event listeners ---
-    webview.addEventListener('did-start-loading', () => {
-        if (webview.getAttribute('data-id') === activeTabId) {
-            reloadBtn.innerHTML = '&#10005;';
-        }
-    });
-
-    webview.addEventListener('did-stop-loading', () => {
-        const activeWebview = getActiveWebview();
-        if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
-            urlBar.value = webview.getURL();
-            backBtn.disabled = !webview.canGoBack();
-            forwardBtn.disabled = !webview.canGoForward();
-            reloadBtn.innerHTML = '&#x21bb;';
-        }
-        
-        titleSpan.textContent = webview.getTitle().substring(0, 25) || "New Tab";
-    });
-
-    webview.addEventListener('did-navigate', (event) => {
-        if (webview.getAttribute('data-id') === activeTabId) {
-            urlBar.value = event.url;
-        }
-    });
-    
-    // 4. Add the new elements to the DOM
+    // Add to DOM immediately so animation starts
     tabList.appendChild(tabButton);
-    webviewContainer.appendChild(webview);
+    
+    // Scroll to bottom
+    tabList.scrollTop = tabList.scrollHeight;
 
-    // 5. Activate the new tab
-    activateTab(tabId);
+    // --- PART 2: Create the Webview (Delayed for animation smoothness) ---
+    setTimeout(() => {
+        const webview = document.createElement('webview');
+        webview.className = 'webview-item';
+        webview.setAttribute('data-id', tabId);
+        webview.src = url;
+
+        // Add webview event listeners
+        webview.addEventListener('did-start-loading', () => {
+            if (webview.getAttribute('data-id') === activeTabId) {
+                reloadBtn.innerHTML = '&#10005;';
+            }
+        });
+
+        webview.addEventListener('did-stop-loading', () => {
+            const activeWebview = getActiveWebview();
+            if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
+                urlBar.value = webview.getURL();
+                backBtn.disabled = !webview.canGoBack();
+                forwardBtn.disabled = !webview.canGoForward();
+                reloadBtn.innerHTML = '&#x21bb;';
+            }
+            
+            titleSpan.textContent = webview.getTitle().substring(0, 25) || "New Tab";
+        });
+
+        webview.addEventListener('did-navigate', (event) => {
+            if (webview.getAttribute('data-id') === activeTabId) {
+                urlBar.value = event.url;
+            }
+        });
+
+        webviewContainer.appendChild(webview);
+        activateTab(tabId);
+        
+    }, 50);
 }
 
 /**
- * --- UPDATED: Creates a new folder ---
- * @param {HTMLElement} parentElement - The container to add the folder to.
+ * Creates a new folder
  */
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
@@ -226,8 +246,8 @@ function createNewFolder(parentElement) {
 
     // 5. Make the new folder content area sortable
     new Sortable(folderContent, {
-        group: 'shared-tabs', // Allow items to be dragged in/out
-        handle: '.tab-item, .folder-item', // Allow tabs AND folders to be dragged
+        group: 'shared-tabs',
+        handle: '.tab-item, .folder-item',
         animation: 150,
     });
 }
@@ -324,25 +344,19 @@ function initResizer() {
     });
 }
 
-/**
- * --- UPDATED: Initializes all sortable lists ---
- */
 function initSortable() {
-    // Make the main tab-list sortable
     new Sortable(tabList, {
-        group: 'shared-tabs', // All lists with this name can share items
-        handle: '.tab-item, .folder-item', // Allow tabs AND folders to be dragged
-        filter: '.folder-content', // Don't let the folder content be dragged
+        group: 'shared-tabs',
+        handle: '.tab-item, .folder-item',
+        filter: '.folder-content',
         animation: 150,
     });
 }
-
 
 // --- 4. Initialization ---
 createNewTab();
 initResizer();
 initSortable();
-
 
 // --- 5. Theme Logic ---
 
@@ -375,61 +389,51 @@ if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').match
     colorPicker.value = '#e9ebee';
 }
 
-// --- 6. Context Menu Logic (UPDATED) ---
+// --- 6. Context Menu Logic ---
 
-// Hide menu on any left-click
 window.addEventListener('click', () => {
     contextMenu.style.display = 'none';
 });
 
-// Main context menu listener for the sidebar
-// Main context menu listener for the sidebar
 sidebar.addEventListener('contextmenu', (e) => {
     e.preventDefault();
 
     const clickedFolder = e.target.closest('.folder-item');
     
-    // Always show the "New Folder" (root) button
     ctxAddFolder.style.display = 'block';
-
-    // Hide folder-specific buttons by default
     ctxAddNestedFolder.style.display = 'none';
     ctxRenameFolder.style.display = 'none';
     ctxDeleteFolder.style.display = 'none';
 
     if (clickedFolder) {
-        // We right-clicked *on* a folder header
-        ctxAddNestedFolder.style.display = 'block'; // Show nested folder button
+        ctxAddNestedFolder.style.display = 'block';
         ctxRenameFolder.style.display = 'block';
         ctxDeleteFolder.style.display = 'block';
-        
-        // Store which folder we clicked for all folder actions
         contextMenu.dataset.targetId = clickedFolder.dataset.id;
     } else {
-        // We right-clicked on empty space, a tab, or inside a folder's content
-        contextMenu.dataset.targetId = ''; // Clear folder-action target
+        contextMenu.dataset.targetId = '';
     }
+    
+    // Determine where a "New Folder" (root) or "Nested" should go
+    contextMenuTargetContainer = e.target.closest('.folder-content') || tabList;
 
-    // Position and show the menu
     contextMenu.style.top = `${e.clientY}px`;
     contextMenu.style.left = `${e.clientX}px`;
     contextMenu.style.display = 'block';
 });
 
-// --- Context Menu Button Listeners (UPDATED) ---
-
 ctxAddFolder.addEventListener('click', () => {
-    // This button *always* creates a folder in the root tabList
+    // Always add to root
     createNewFolder(tabList);
     contextMenu.style.display = 'none';
 });
 
 ctxAddNestedFolder.addEventListener('click', () => {
     const folderId = contextMenu.dataset.targetId;
-    const folderContent = document.getElementById(folderId); // This is the .folder-content div
+    const folderContent = document.getElementById(folderId);
     
     if (folderContent) {
-        createNewFolder(folderContent); // Create the new folder *inside* the one we clicked
+        createNewFolder(folderContent);
     }
     contextMenu.style.display = 'none';
 });
@@ -457,16 +461,10 @@ ctxDeleteFolder.addEventListener('click', () => {
     const folderContent = document.getElementById(folderId);
 
     if (folderHeader && folderContent) {
-        // Find the parent container (where to move items to)
         const parentContainer = folderHeader.parentElement;
-
-        // Move all children (tabs, folders, etc.) up one level
         while (folderContent.firstChild) {
-            // Insert each item before the folder header we're about to delete
             parentContainer.insertBefore(folderContent.firstChild, folderHeader);
         }
-        
-        // Now, delete the empty folder
         folderHeader.remove();
         folderContent.remove();
     }

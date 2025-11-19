@@ -368,7 +368,44 @@
             width: 0 !important;
             pointer-events: none;
         }
+        /* --- NEW: Tab Animations --- */
+        @keyframes tabEnter {
+            from { 
+                opacity: 0; 
+                transform: translateY(10px) scale(0.95); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+            }
+        }
         
+        @keyframes tabExit {
+            to { 
+                opacity: 0; 
+                transform: scale(0.9); 
+                /* Shrink space to 0 to let other tabs slide up */
+                margin-top: 0; 
+                margin-bottom: 0; 
+                height: 0; 
+                padding-top: 0; 
+                padding-bottom: 0; 
+            }
+        }
+
+        /* Add animation to base class for Entry */
+        .tab-item {
+            /* ... existing styles ... */
+            /* Add this line: */
+            animation: tabEnter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        /* Class for Exit */
+        .tab-item.closing {
+            animation: tabExit 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            pointer-events: none; /* Prevent clicking while closing */
+        }
+
     </style>
 </head>
 <body>
