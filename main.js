@@ -1,4 +1,4 @@
-// main.js - Incognito, History, and Restore shortcuts
+// main.js - Fixed Incognito & robust handling
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
@@ -22,7 +22,7 @@ function createMainWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(__dirname, 'assets/icon.png'),
+        icon: path.join(__dirname, 'assets/Sol Logo.png'),
         show: false,
         webPreferences: {
             nodeIntegration: true,
@@ -35,7 +35,6 @@ function createMainWindow() {
     mainWindow.setMenu(null);
 
     mainWindow.once('ready-to-show', () => {
-        // Only show if splash exists (it might have been closed already)
         setTimeout(() => {
             if (splashWindow && !splashWindow.isDestroyed()) splashWindow.destroy();
             mainWindow.show();
@@ -43,7 +42,7 @@ function createMainWindow() {
     });
 }
 
-// --- NEW: Incognito Window Function ---
+// --- Incognito Window Function ---
 function createIncognitoWindow() {
     const incognitoWin = new BrowserWindow({
         width: 1200,
@@ -54,22 +53,22 @@ function createIncognitoWindow() {
             nodeIntegration: true,
             contextIsolation: false,
             webviewTag: true,
-            // The 'partition' string makes the session unique and temporary
+            // This partition string creates a temporary, isolated session
             partition: 'incognito_view_' + Date.now() 
         }
     });
 
     incognitoWin.loadFile('index.html');
     incognitoWin.setMenu(null);
-    // Add a dark gray background to distinguish it
-    incognitoWin.setBackgroundColor('#1a1a1a'); 
+    // Dark background to distinguish
+    incognitoWin.setBackgroundColor('#222'); 
 }
 
 app.whenReady().then(() => {
     createSplashWindow();
     createMainWindow();
 
-    // --- ROBUST SHORTCUT HANDLER ---
+    // --- Global Keyboard Shortcuts (Inside Webviews) ---
     app.on('web-contents-created', (e, contents) => {
         if (contents.getType() === 'webview') {
             contents.on('before-input-event', (event, input) => {
@@ -83,10 +82,8 @@ app.whenReady().then(() => {
                         // TABS
                         case 'KeyT': 
                             if (isShift) {
-                                // Ctrl + Shift + T (Restore)
                                 mainWindow.webContents.send('shortcut-restore-tab');
                             } else {
-                                // Ctrl + T (New Tab)
                                 mainWindow.webContents.send('shortcut-new-tab');
                             }
                             event.preventDefault();
@@ -136,7 +133,7 @@ app.on('activate', () => {
     }
 });
 
-// IPC Listeners
+// IPC Listeners (Commands from Renderer)
 ipcMain.on('toggle-fullscreen', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window) window.setFullScreen(!window.isFullScreen());
@@ -149,4 +146,9 @@ ipcMain.on('toggle-devtools', (event) => {
 
 ipcMain.on('quit-app', () => {
     app.quit();
+});
+
+// NEW: Listen for incognito request from renderer
+ipcMain.on('new-incognito-window', () => {
+    createIncognitoWindow();
 });

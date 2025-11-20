@@ -1,4 +1,4 @@
-// renderer.js - History, Restore, and Incognito logic added
+// renderer.js - Persistent History & Incognito Fix
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
@@ -40,9 +40,9 @@ const spotlightInput = document.getElementById('spotlight-input');
 let activeTabId = null;
 let contextMenuTargetContainer = null;
 
-// NEW: Data Storage
-const historyLog = []; // Stores { title, url, time }
-const closedTabsStack = []; // Stores URLs of closed tabs (LIFO)
+// NEW: Load history from storage (or empty array if new)
+let historyLog = JSON.parse(localStorage.getItem('solHistory')) || [];
+const closedTabsStack = []; 
 
 // --- 2. Helper Functions ---
 
@@ -51,7 +51,6 @@ function getActiveWebview() {
 }
 
 function processUrl(input) {
-    // Handle internal history page
     if (input === 'sol://history') return input; 
 
     if (input.includes(' ')) {
@@ -67,7 +66,6 @@ function processUrl(input) {
     return 'https://www.google.com/search?q=' + encodeURIComponent(input);
 }
 
-// --- NEW: Restore Last Closed Tab ---
 function restoreClosedTab() {
     if (closedTabsStack.length > 0) {
         const lastUrl = closedTabsStack.pop();
@@ -75,30 +73,47 @@ function restoreClosedTab() {
     }
 }
 
-// --- NEW: Open History Tab ---
+// --- UPDATED: History Tab UI ---
 function openHistoryTab() {
-    // Generate a simple HTML page for history
-    let listItems = historyLog.map(item => `
-        <li style="margin-bottom: 10px; padding: 10px; background: #333; border-radius: 6px;">
-            <div style="font-weight:bold; color: #fff;">${item.title}</div>
-            <div style="color: #aaa; font-size: 0.9em;">${item.url}</div>
-            <div style="color: #666; font-size: 0.8em;">${item.time}</div>
+    // Generate a nice looking list
+    const listItems = historyLog.map(item => {
+        // Use Google's service to get a favicon for the domain
+        const domain = new URL(item.url).hostname;
+        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+        
+        return `
+        <li class="history-item">
+            <img src="${faviconUrl}" class="favicon" onerror="this.style.display='none'">
+            <div class="info">
+                <div class="time">${item.time}</div>
+                <a href="${item.url}" class="title">${item.title || item.url}</a>
+                <div class="url">${item.url}</div>
+            </div>
         </li>
-    `).reverse().join('');
+    `}).reverse().join('');
 
     const htmlContent = `
         data:text/html,
+        <!DOCTYPE html>
         <html>
         <head>
             <title>History</title>
             <style>
-                body { font-family: system-ui; background: #222; color: white; padding: 40px; }
-                h1 { border-bottom: 1px solid #444; padding-bottom: 10px; }
-                ul { list-style: none; padding: 0; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #e0e0e0; margin: 0; padding: 40px; }
+                h1 { font-weight: 300; border-bottom: 1px solid #333; padding-bottom: 20px; color: #fff; }
+                ul { list-style: none; padding: 0; max-width: 800px; margin: 0 auto; }
+                .history-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #333; transition: background 0.2s; }
+                .history-item:hover { background: #2a2a2a; border-radius: 6px; }
+                .favicon { width: 20px; height: 20px; margin-right: 15px; border-radius: 4px; }
+                .info { flex: 1; overflow: hidden; }
+                .time { font-size: 12px; color: #777; margin-bottom: 2px; }
+                .title { font-size: 16px; color: #4a90e2; text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+                .title:hover { text-decoration: underline; }
+                .url { font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             </style>
         </head>
         <body>
-            <h1>Browsing History</h1>
+            <h1>History</h1>
             <ul>${listItems}</ul>
         </body>
         </html>
@@ -122,13 +137,10 @@ function closeTab(tabId) {
 
     if (!tabButton || !webview) return;
 
-    // --- NEW: Save URL before closing ---
-    // Don't save if it's the history page or blank
     const currentUrl = webview.getURL();
     if (currentUrl && !currentUrl.startsWith('data:')) {
         closedTabsStack.push(currentUrl);
     }
-    // ------------------------------------
 
     let nextTabId = null;
     if (activeTabId === tabId) {
@@ -175,7 +187,6 @@ function activateTab(tabId) {
     webview.classList.add('active');
 
     if (typeof webview.getURL === 'function') {
-        // Handle special history URL display
         const currentUrl = webview.getURL();
         if (currentUrl.startsWith('data:')) {
              urlBar.value = "sol://history";
@@ -230,7 +241,6 @@ function createNewTab(url = "https://www.google.com") {
             const activeWebview = getActiveWebview();
             if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
                 const currentUrl = webview.getURL();
-                // Clean up data URLs for the URL bar
                 if (currentUrl.startsWith('data:')) {
                     urlBar.value = "sol://history";
                     titleSpan.textContent = "History";
@@ -245,7 +255,7 @@ function createNewTab(url = "https://www.google.com") {
             }
         });
 
-        // --- NEW: History Tracking ---
+        // --- UPDATED: History Tracking with Persistence ---
         webview.addEventListener('did-navigate', (event) => {
             if (webview.getAttribute('data-id') === activeTabId) {
                 if (!event.url.startsWith('data:')) {
@@ -253,13 +263,14 @@ function createNewTab(url = "https://www.google.com") {
                 }
             }
             
-            // Log to history array
             if (event.url && !event.url.startsWith('data:')) {
                 historyLog.push({
                     title: webview.getTitle() || event.url,
                     url: event.url,
-                    time: new Date().toLocaleTimeString()
+                    time: new Date().toLocaleString()
                 });
+                // SAVE to local storage immediately
+                localStorage.setItem('solHistory', JSON.stringify(historyLog));
             }
         });
 
@@ -268,7 +279,6 @@ function createNewTab(url = "https://www.google.com") {
     }, 50);
 }
 
-// ... (createNewFolder, stopEditingFolderTitle, handleRenameKeys remain unchanged) ...
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
     const folderItem = document.createElement('div');
@@ -315,8 +325,6 @@ function handleRenameKeys(e) {
         stopEditingFolderTitle(e.target);
     }
 }
-
-// Spotlight Logic
 function toggleSpotlight() {
     const isVisible = spotlightOverlay.classList.contains('visible');
     if (isVisible) {
@@ -343,21 +351,24 @@ spotlightInput.addEventListener('keydown', (e) => {
 
 // --- 3. Event Listeners ---
 
-// NEW: Listeners for Keyboard Shortcuts from Main Process
 ipcRenderer.on('shortcut-new-tab', () => toggleSpotlight());
 ipcRenderer.on('shortcut-close-tab', () => closeTab()); 
 ipcRenderer.on('shortcut-toggle-sidebar', () => {
     sidebar.classList.toggle('hidden');
     resizer.classList.toggle('hidden');
 });
-ipcRenderer.on('shortcut-restore-tab', () => restoreClosedTab()); // Ctrl+Shift+T
-ipcRenderer.on('shortcut-history', () => openHistoryTab());       // Ctrl+H
+ipcRenderer.on('shortcut-restore-tab', () => restoreClosedTab());
+ipcRenderer.on('shortcut-history', () => openHistoryTab());
 
-// Local Key Listeners
+// --- UPDATED: Global Key Listeners ---
 window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') { // Restore
         event.preventDefault();
         restoreClosedTab();
+    }
+    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n') { // Incognito
+        event.preventDefault();
+        ipcRenderer.send('new-incognito-window');
     }
     else if (event.ctrlKey && event.key === 't') { // New Tab
         event.preventDefault();
@@ -381,7 +392,6 @@ window.addEventListener('keydown', (event) => {
     }
 });
 
-// Sidebar URL Bar
 urlBar.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         let input = urlBar.value;
