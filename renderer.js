@@ -1,9 +1,9 @@
-// renderer.js - Fixed "One Tab" closing issue
+// renderer.js - History, Restore, and Incognito logic added
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
 
-// --- 1. Get elements from the DOM ---
+// --- 1. DOM Elements ---
 const sidebar = document.getElementById('sidebar');
 const resizer = document.getElementById('resizer');
 const urlBar = document.getElementById('url-bar');
@@ -13,31 +13,36 @@ const reloadBtn = document.getElementById('reload-btn');
 const tabList = document.getElementById('tab-list');
 const webviewContainer = document.getElementById('webview-container');
 
-// Theme elements
+// Theme & Settings
 const darkModeToggleBtn = document.getElementById('dark-mode-toggle-btn');
 const colorPicker = document.getElementById('sidebar-color-picker');
 const resetColorBtn = document.getElementById('reset-color-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const themeControls = document.getElementById('theme-controls');
 
-// Context Menu elements
+// Context Menu
 const contextMenu = document.getElementById('context-menu');
 const ctxAddFolder = document.getElementById('ctx-add-folder');
 const ctxAddNestedFolder = document.getElementById('ctx-add-nested-folder');
 const ctxRenameFolder = document.getElementById('ctx-rename-folder');
 const ctxDeleteFolder = document.getElementById('ctx-delete-folder');
 
-// Menu buttons
+// Menu Buttons
 const toggleFullscreenBtn = document.getElementById('toggle-fullscreen-btn');
 const toggleDevtoolsBtn = document.getElementById('toggle-devtools-btn');
 const quitBtn = document.getElementById('quit-btn');
 
-// Spotlight Elements
+// Spotlight
 const spotlightOverlay = document.getElementById('spotlight-overlay');
 const spotlightInput = document.getElementById('spotlight-input');
 
+// --- Global State ---
 let activeTabId = null;
 let contextMenuTargetContainer = null;
+
+// NEW: Data Storage
+const historyLog = []; // Stores { title, url, time }
+const closedTabsStack = []; // Stores URLs of closed tabs (LIFO)
 
 // --- 2. Helper Functions ---
 
@@ -46,12 +51,15 @@ function getActiveWebview() {
 }
 
 function processUrl(input) {
+    // Handle internal history page
+    if (input === 'sol://history') return input; 
+
     if (input.includes(' ')) {
         return 'https://www.google.com/search?q=' + encodeURIComponent(input);
     }
     const domainRegex = /^([a-z0-9]+(-[a-z0-9]+)*\.)+[a-z]{2,}$/i;
     if (domainRegex.test(input) || input.startsWith('localhost') || input.includes('://')) {
-        if (!input.startsWith('http://') && !input.startsWith('https://') && !input.startsWith('file://')) {
+        if (!input.startsWith('http://') && !input.startsWith('https://') && !input.startsWith('file://') && !input.startsWith('data:')) {
             return 'https://' + input;
         }
         return input;
@@ -59,17 +67,53 @@ function processUrl(input) {
     return 'https://www.google.com/search?q=' + encodeURIComponent(input);
 }
 
-/**
- * FIXED: closes the specific tab, or the active one if no ID provided
- */
+// --- NEW: Restore Last Closed Tab ---
+function restoreClosedTab() {
+    if (closedTabsStack.length > 0) {
+        const lastUrl = closedTabsStack.pop();
+        createNewTab(lastUrl);
+    }
+}
+
+// --- NEW: Open History Tab ---
+function openHistoryTab() {
+    // Generate a simple HTML page for history
+    let listItems = historyLog.map(item => `
+        <li style="margin-bottom: 10px; padding: 10px; background: #333; border-radius: 6px;">
+            <div style="font-weight:bold; color: #fff;">${item.title}</div>
+            <div style="color: #aaa; font-size: 0.9em;">${item.url}</div>
+            <div style="color: #666; font-size: 0.8em;">${item.time}</div>
+        </li>
+    `).reverse().join('');
+
+    const htmlContent = `
+        data:text/html,
+        <html>
+        <head>
+            <title>History</title>
+            <style>
+                body { font-family: system-ui; background: #222; color: white; padding: 40px; }
+                h1 { border-bottom: 1px solid #444; padding-bottom: 10px; }
+                ul { list-style: none; padding: 0; }
+            </style>
+        </head>
+        <body>
+            <h1>Browsing History</h1>
+            <ul>${listItems}</ul>
+        </body>
+        </html>
+    `;
+    
+    createNewTab(htmlContent);
+}
+
 function closeTab(tabId) {
-    // 1. If no ID passed, find the currently active tab from the DOM
     if (!tabId) {
         const activeItem = document.querySelector('.tab-item.active');
         if (activeItem) {
             tabId = activeItem.dataset.id;
         } else {
-            return; // No tabs to close
+            return; 
         }
     }
 
@@ -78,35 +122,34 @@ function closeTab(tabId) {
 
     if (!tabButton || !webview) return;
 
-    // 2. Determine the next tab to activate
+    // --- NEW: Save URL before closing ---
+    // Don't save if it's the history page or blank
+    const currentUrl = webview.getURL();
+    if (currentUrl && !currentUrl.startsWith('data:')) {
+        closedTabsStack.push(currentUrl);
+    }
+    // ------------------------------------
+
     let nextTabId = null;
-    
-    // Only look for a new tab if we are closing the one that is currently active
-    if (tabButton.classList.contains('active')) {
+    if (activeTabId === tabId) {
         const allTabs = Array.from(document.querySelectorAll('.tab-item'));
         const currentIndex = allTabs.findIndex(tab => tab.dataset.id === tabId);
 
         if (currentIndex !== -1 && allTabs.length > 1) {
-            // Try to go to the next tab
             if (currentIndex < allTabs.length - 1) {
                 nextTabId = allTabs[currentIndex + 1].dataset.id;
-            } 
-            // If we are at the end, go to the previous tab
-            else if (currentIndex > 0) {
+            } else if (currentIndex > 0) {
                 nextTabId = allTabs[currentIndex - 1].dataset.id;
             }
         }
     }
 
-    // 3. Switch active tab immediately
     if (nextTabId) {
         activateTab(nextTabId);
     }
 
-    // 4. Start the Exit Animation
     tabButton.classList.add('closing');
 
-    // 5. Wait for animation to finish, then delete
     setTimeout(() => {
         tabButton.remove();
         webview.remove();
@@ -132,7 +175,14 @@ function activateTab(tabId) {
     webview.classList.add('active');
 
     if (typeof webview.getURL === 'function') {
-        urlBar.value = webview.getURL();
+        // Handle special history URL display
+        const currentUrl = webview.getURL();
+        if (currentUrl.startsWith('data:')) {
+             urlBar.value = "sol://history";
+        } else {
+             urlBar.value = currentUrl;
+        }
+        
         backBtn.disabled = !webview.canGoBack();
         forwardBtn.disabled = !webview.canGoForward();
     } else {
@@ -179,17 +229,38 @@ function createNewTab(url = "https://www.google.com") {
         webview.addEventListener('did-stop-loading', () => {
             const activeWebview = getActiveWebview();
             if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
-                urlBar.value = webview.getURL();
-                backBtn.disabled = !webview.canGoBack();
-                forwardBtn.disabled = !webview.canGoForward();
+                const currentUrl = webview.getURL();
+                // Clean up data URLs for the URL bar
+                if (currentUrl.startsWith('data:')) {
+                    urlBar.value = "sol://history";
+                    titleSpan.textContent = "History";
+                } else {
+                    urlBar.value = currentUrl;
+                    backBtn.disabled = !webview.canGoBack();
+                    forwardBtn.disabled = !webview.canGoForward();
+                    let cleanTitle = webview.getTitle().replace(' - Google Search', '');
+                    titleSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
+                }
                 reloadBtn.innerHTML = '&#x21bb;';
             }
-            let cleanTitle = webview.getTitle().replace(' - Google Search', '');
-            titleSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
         });
 
+        // --- NEW: History Tracking ---
         webview.addEventListener('did-navigate', (event) => {
-            if (webview.getAttribute('data-id') === activeTabId) urlBar.value = event.url;
+            if (webview.getAttribute('data-id') === activeTabId) {
+                if (!event.url.startsWith('data:')) {
+                    urlBar.value = event.url;
+                }
+            }
+            
+            // Log to history array
+            if (event.url && !event.url.startsWith('data:')) {
+                historyLog.push({
+                    title: webview.getTitle() || event.url,
+                    url: event.url,
+                    time: new Date().toLocaleTimeString()
+                });
+            }
         });
 
         webviewContainer.appendChild(webview);
@@ -197,6 +268,7 @@ function createNewTab(url = "https://www.google.com") {
     }, 50);
 }
 
+// ... (createNewFolder, stopEditingFolderTitle, handleRenameKeys remain unchanged) ...
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
     const folderItem = document.createElement('div');
@@ -206,7 +278,6 @@ function createNewFolder(parentElement) {
     const toggle = document.createElement('span');
     toggle.className = 'folder-toggle';
     toggle.innerHTML = '&#9660;';
-    
     const title = document.createElement('span');
     title.className = 'folder-title';
     title.textContent = 'New Folder';
@@ -232,7 +303,6 @@ function createNewFolder(parentElement) {
         animation: 150,
     });
 }
-
 function stopEditingFolderTitle(titleElement) {
     titleElement.setAttribute('contenteditable', 'false');
     titleElement.removeEventListener('blur', stopEditingFolderTitle);
@@ -246,6 +316,7 @@ function handleRenameKeys(e) {
     }
 }
 
+// Spotlight Logic
 function toggleSpotlight() {
     const isVisible = spotlightOverlay.classList.contains('visible');
     if (isVisible) {
@@ -272,37 +343,45 @@ spotlightInput.addEventListener('keydown', (e) => {
 
 // --- 3. Event Listeners ---
 
-// Handle shortcuts from the Main Process (when focus is in webview)
+// NEW: Listeners for Keyboard Shortcuts from Main Process
 ipcRenderer.on('shortcut-new-tab', () => toggleSpotlight());
-
-// REMOVED check for activeTabId here, relying on closeTab internal check
 ipcRenderer.on('shortcut-close-tab', () => closeTab()); 
-
 ipcRenderer.on('shortcut-toggle-sidebar', () => {
     sidebar.classList.toggle('hidden');
     resizer.classList.toggle('hidden');
 });
+ipcRenderer.on('shortcut-restore-tab', () => restoreClosedTab()); // Ctrl+Shift+T
+ipcRenderer.on('shortcut-history', () => openHistoryTab());       // Ctrl+H
 
-// Handle shortcuts locally (when focus is in sidebar/spotlight)
+// Local Key Listeners
 window.addEventListener('keydown', (event) => {
-    if (event.ctrlKey && event.key === 't') {
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') { // Restore
+        event.preventDefault();
+        restoreClosedTab();
+    }
+    else if (event.ctrlKey && event.key === 't') { // New Tab
         event.preventDefault();
         toggleSpotlight(); 
     }
-    else if (event.ctrlKey && event.key === 'w') {
+    else if (event.ctrlKey && event.key === 'w') { // Close
         event.preventDefault();
-        closeTab(); // Call without ID, let function find active tab
+        closeTab(); 
     }
-    else if (event.ctrlKey && event.key === 's') {
+    else if (event.ctrlKey && event.key === 's') { // Toggle Sidebar
         event.preventDefault();
         sidebar.classList.toggle('hidden');
         resizer.classList.toggle('hidden');
+    }
+    else if (event.ctrlKey && event.key === 'h') { // History
+        event.preventDefault();
+        openHistoryTab();
     }
     else if (event.key === 'Escape' && spotlightOverlay.classList.contains('visible')) {
         toggleSpotlight();
     }
 });
 
+// Sidebar URL Bar
 urlBar.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         let input = urlBar.value;
