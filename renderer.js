@@ -1,9 +1,26 @@
-// renderer.js - Persistent History & Incognito Fix
+// renderer.js - Fixed Incognito (Shared Session, Dark Mode, Landing Page)
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
 
-// --- 1. DOM Elements ---
+// --- 1. Detect Incognito Mode & Force Theme ---
+const isIncognito = window.process.argv.includes('--is-incognito');
+
+// FORCE DARK MODE if Incognito
+if (isIncognito) {
+    document.body.dataset.theme = 'dark';
+    document.title += " (Incognito)";
+    // Disable theme toggle buttons since we are forced dark
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggleBtn = document.getElementById('dark-mode-toggle-btn');
+        if (toggleBtn) {
+            toggleBtn.disabled = true;
+            toggleBtn.textContent = "Dark Mode Locked (Incognito)";
+        }
+    });
+}
+
+// --- 2. DOM Elements ---
 const sidebar = document.getElementById('sidebar');
 const resizer = document.getElementById('resizer');
 const urlBar = document.getElementById('url-bar');
@@ -36,15 +53,20 @@ const quitBtn = document.getElementById('quit-btn');
 const spotlightOverlay = document.getElementById('spotlight-overlay');
 const spotlightInput = document.getElementById('spotlight-input');
 
-// --- Global State ---
+// Global State
 let activeTabId = null;
 let contextMenuTargetContainer = null;
 
-// NEW: Load history from storage (or empty array if new)
-let historyLog = JSON.parse(localStorage.getItem('solHistory')) || [];
+// Load history only if NOT incognito
+let historyLog = [];
+if (!isIncognito) {
+    try {
+        historyLog = JSON.parse(localStorage.getItem('solHistory')) || [];
+    } catch (e) { console.error(e); }
+}
 const closedTabsStack = []; 
 
-// --- 2. Helper Functions ---
+// --- 3. Helper Functions ---
 
 function getActiveWebview() {
     return document.querySelector(`.webview-item.active`);
@@ -52,6 +74,7 @@ function getActiveWebview() {
 
 function processUrl(input) {
     if (input === 'sol://history') return input; 
+    if (input === 'sol://incognito') return input; // Internal ID for incognito page
 
     if (input.includes(' ')) {
         return 'https://www.google.com/search?q=' + encodeURIComponent(input);
@@ -73,24 +96,43 @@ function restoreClosedTab() {
     }
 }
 
-// --- UPDATED: History Tab UI ---
 function openHistoryTab() {
-    // Generate a nice looking list
-    const listItems = historyLog.map(item => {
-        // Use Google's service to get a favicon for the domain
-        const domain = new URL(item.url).hostname;
-        const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
-        
-        return `
-        <li class="history-item">
-            <img src="${faviconUrl}" class="favicon" onerror="this.style.display='none'">
-            <div class="info">
+    if (isIncognito) return; // No history in incognito
+
+    const groups = {};
+    const sortedHistory = [...historyLog].reverse();
+
+    sortedHistory.forEach(item => {
+        const date = new Date(item.timestamp);
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        let dateKey = date.toLocaleDateString();
+        if (date.toDateString() === today.toDateString()) dateKey = "Today";
+        else if (date.toDateString() === yesterday.toDateString()) dateKey = "Yesterday";
+
+        if (!groups[dateKey]) groups[dateKey] = [];
+        groups[dateKey].push(item);
+    });
+
+    let listHtml = '';
+    for (const [dateLabel, items] of Object.entries(groups)) {
+        listHtml += `<h2 class="date-header">${dateLabel}</h2>`;
+        items.forEach(item => {
+            const domain = new URL(item.url).hostname;
+            const faviconUrl = `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+            listHtml += `
+            <div class="history-item" data-search="${(item.title + item.url).toLowerCase()}">
                 <div class="time">${item.time}</div>
-                <a href="${item.url}" class="title">${item.title || item.url}</a>
-                <div class="url">${item.url}</div>
-            </div>
-        </li>
-    `}).reverse().join('');
+                <img src="${faviconUrl}" class="favicon">
+                <div class="info">
+                    <a href="${item.url}" class="title">${item.title || item.url}</a>
+                    <div class="url">${domain}</div>
+                </div>
+            </div>`;
+        });
+    }
 
     const htmlContent = `
         data:text/html,
@@ -99,37 +141,46 @@ function openHistoryTab() {
         <head>
             <title>History</title>
             <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #e0e0e0; margin: 0; padding: 40px; }
+                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #1e1e1e; color: #e0e0e0; margin: 0; padding: 40px; max-width: 800px; margin: 0 auto; }
                 h1 { font-weight: 300; border-bottom: 1px solid #333; padding-bottom: 20px; color: #fff; }
-                ul { list-style: none; padding: 0; max-width: 800px; margin: 0 auto; }
-                .history-item { display: flex; align-items: center; padding: 12px; border-bottom: 1px solid #333; transition: background 0.2s; }
-                .history-item:hover { background: #2a2a2a; border-radius: 6px; }
-                .favicon { width: 20px; height: 20px; margin-right: 15px; border-radius: 4px; }
+                .header-bar { display: flex; align-items: center; margin-bottom: 30px; }
+                input#search { padding: 10px; border-radius: 6px; border: none; background: #333; color: white; width: 300px; font-size: 14px; margin-left: auto; }
+                .date-header { font-size: 14px; font-weight: 600; color: #888; margin-top: 30px; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+                .history-item { display: flex; align-items: center; padding: 8px 12px; border-radius: 8px; transition: background 0.1s; margin-bottom: 2px; }
+                .history-item:hover { background: #2a2a2a; }
+                .time { width: 60px; font-size: 12px; color: #666; }
+                .favicon { width: 16px; height: 16px; margin-right: 15px; }
                 .info { flex: 1; overflow: hidden; }
-                .time { font-size: 12px; color: #777; margin-bottom: 2px; }
-                .title { font-size: 16px; color: #4a90e2; text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-                .title:hover { text-decoration: underline; }
-                .url { font-size: 12px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .title { font-size: 14px; color: #e0e0e0; text-decoration: none; font-weight: 500; display: block; }
+                .title:hover { color: #4a90e2; }
+                .url { font-size: 12px; color: #666; margin-top: 2px; }
             </style>
         </head>
         <body>
-            <h1>History</h1>
-            <ul>${listItems}</ul>
+            <div class="header-bar"><h1>History</h1><input type="text" id="search" placeholder="Search history..."></div>
+            <div id="history-list">${listHtml}</div>
+            <script>
+                const searchInput = document.getElementById('search');
+                const items = document.querySelectorAll('.history-item');
+                searchInput.addEventListener('input', (e) => {
+                    const term = e.target.value.toLowerCase();
+                    items.forEach(item => {
+                        const text = item.getAttribute('data-search');
+                        item.style.display = text.includes(term) ? 'flex' : 'none';
+                    });
+                });
+            </script>
         </body>
         </html>
     `;
-    
     createNewTab(htmlContent);
 }
 
 function closeTab(tabId) {
     if (!tabId) {
         const activeItem = document.querySelector('.tab-item.active');
-        if (activeItem) {
-            tabId = activeItem.dataset.id;
-        } else {
-            return; 
-        }
+        if (activeItem) tabId = activeItem.dataset.id;
+        else return; 
     }
 
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
@@ -138,7 +189,7 @@ function closeTab(tabId) {
     if (!tabButton || !webview) return;
 
     const currentUrl = webview.getURL();
-    if (currentUrl && !currentUrl.startsWith('data:')) {
+    if (!isIncognito && currentUrl && !currentUrl.startsWith('data:')) {
         closedTabsStack.push(currentUrl);
     }
 
@@ -156,9 +207,7 @@ function closeTab(tabId) {
         }
     }
 
-    if (nextTabId) {
-        activateTab(nextTabId);
-    }
+    if (nextTabId) activateTab(nextTabId);
 
     tabButton.classList.add('closing');
 
@@ -189,7 +238,10 @@ function activateTab(tabId) {
     if (typeof webview.getURL === 'function') {
         const currentUrl = webview.getURL();
         if (currentUrl.startsWith('data:')) {
-             urlBar.value = "sol://history";
+             // Only show "History" or "Incognito" in URL bar, not the huge data string
+             if (currentUrl.includes('<title>History</title>')) urlBar.value = "sol://history";
+             else if (currentUrl.includes('<title>You are Incognito</title>')) urlBar.value = ""; // Empty for incognito home
+             else urlBar.value = "about:blank";
         } else {
              urlBar.value = currentUrl;
         }
@@ -204,7 +256,45 @@ function activateTab(tabId) {
     activeTabId = tabId;
 }
 
-function createNewTab(url = "https://www.google.com") {
+function createNewTab(url) {
+    // DEFAULT URL LOGIC
+    if (!url) {
+        if (isIncognito) {
+            // --- NEW: Custom Incognito Landing Page ---
+            url = `
+                data:text/html,
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>You are Incognito</title>
+                    <style>
+                        body { background-color: #202124; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                        .container { text-align: center; max-width: 600px; }
+                        .icon { font-size: 80px; margin-bottom: 20px; opacity: 0.8; }
+                        h1 { font-weight: 400; }
+                        p { color: #9aa0a6; line-height: 1.6; }
+                        .badge { background: #333; padding: 5px 10px; border-radius: 4px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="icon">🕶️</div>
+                        <h1>You’ve gone Incognito</h1>
+                        <p>Sol Browser won’t save the following information:<br>
+                        • Your browsing history<br>
+                        • Cookies and site data<br>
+                        • Information entered in forms</p>
+                        <br>
+                        <span class="badge">Incognito</span>
+                    </div>
+                </body>
+                </html>
+            `;
+        } else {
+            url = "https://www.google.com";
+        }
+    }
+
     const tabId = "tab-" + Date.now(); 
     const tabButton = document.createElement('div');
     tabButton.className = 'tab-item';
@@ -242,34 +332,39 @@ function createNewTab(url = "https://www.google.com") {
             if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
                 const currentUrl = webview.getURL();
                 if (currentUrl.startsWith('data:')) {
-                    urlBar.value = "sol://history";
-                    titleSpan.textContent = "History";
+                    // Clean UI for data pages
+                    if (currentUrl.includes('<title>History</title>')) {
+                        urlBar.value = "sol://history";
+                        titleSpan.textContent = "History";
+                    } else if (currentUrl.includes('<title>You are Incognito</title>')) {
+                        urlBar.value = "";
+                        titleSpan.textContent = "Incognito";
+                    }
                 } else {
                     urlBar.value = currentUrl;
-                    backBtn.disabled = !webview.canGoBack();
-                    forwardBtn.disabled = !webview.canGoForward();
                     let cleanTitle = webview.getTitle().replace(' - Google Search', '');
                     titleSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
                 }
+                
+                backBtn.disabled = !webview.canGoBack();
+                forwardBtn.disabled = !webview.canGoForward();
                 reloadBtn.innerHTML = '&#x21bb;';
             }
         });
 
-        // --- UPDATED: History Tracking with Persistence ---
         webview.addEventListener('did-navigate', (event) => {
             if (webview.getAttribute('data-id') === activeTabId) {
-                if (!event.url.startsWith('data:')) {
-                    urlBar.value = event.url;
-                }
+                if (!event.url.startsWith('data:')) urlBar.value = event.url;
             }
             
-            if (event.url && !event.url.startsWith('data:')) {
+            // HISTORY LOGGING
+            if (!isIncognito && event.url && !event.url.startsWith('data:')) {
                 historyLog.push({
                     title: webview.getTitle() || event.url,
                     url: event.url,
-                    time: new Date().toLocaleString()
+                    time: new Date().toLocaleString(),
+                    timestamp: Date.now()
                 });
-                // SAVE to local storage immediately
                 localStorage.setItem('solHistory', JSON.stringify(historyLog));
             }
         });
@@ -279,34 +374,29 @@ function createNewTab(url = "https://www.google.com") {
     }, 50);
 }
 
+// ... (createNewFolder, stopEditingFolderTitle, handleRenameKeys, toggleSpotlight remain same) ...
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
     const folderItem = document.createElement('div');
     folderItem.className = 'folder-item';
     folderItem.setAttribute('data-id', folderId);
-
     const toggle = document.createElement('span');
     toggle.className = 'folder-toggle';
     toggle.innerHTML = '&#9660;';
     const title = document.createElement('span');
     title.className = 'folder-title';
     title.textContent = 'New Folder';
-
     folderItem.appendChild(toggle);
     folderItem.appendChild(title);
-
     const folderContent = document.createElement('div');
     folderContent.className = 'folder-content';
     folderContent.id = folderId;
-
     folderItem.addEventListener('click', (e) => {
         if (e.target.className === 'folder-title') return;
         folderItem.classList.toggle('collapsed');
     });
-
     parentElement.appendChild(folderItem);
     parentElement.appendChild(folderContent);
-
     new Sortable(folderContent, {
         group: 'shared-tabs',
         handle: '.tab-item, .folder-item',
@@ -335,9 +425,7 @@ function toggleSpotlight() {
         spotlightInput.focus();
     }
 }
-
 spotlightOverlay.addEventListener('click', (e) => { if (e.target === spotlightOverlay) toggleSpotlight(); });
-
 spotlightInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         let input = spotlightInput.value;
@@ -360,30 +448,30 @@ ipcRenderer.on('shortcut-toggle-sidebar', () => {
 ipcRenderer.on('shortcut-restore-tab', () => restoreClosedTab());
 ipcRenderer.on('shortcut-history', () => openHistoryTab());
 
-// --- UPDATED: Global Key Listeners ---
+// Global Key Listeners
 window.addEventListener('keydown', (event) => {
-    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') { // Restore
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') { 
         event.preventDefault();
         restoreClosedTab();
     }
-    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n') { // Incognito
+    else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n') { 
         event.preventDefault();
         ipcRenderer.send('new-incognito-window');
     }
-    else if (event.ctrlKey && event.key === 't') { // New Tab
+    else if (event.ctrlKey && event.key === 't') { 
         event.preventDefault();
         toggleSpotlight(); 
     }
-    else if (event.ctrlKey && event.key === 'w') { // Close
+    else if (event.ctrlKey && event.key === 'w') { 
         event.preventDefault();
         closeTab(); 
     }
-    else if (event.ctrlKey && event.key === 's') { // Toggle Sidebar
+    else if (event.ctrlKey && event.key === 's') { 
         event.preventDefault();
         sidebar.classList.toggle('hidden');
         resizer.classList.toggle('hidden');
     }
-    else if (event.ctrlKey && event.key === 'h') { // History
+    else if (event.ctrlKey && event.key === 'h') { 
         event.preventDefault();
         openHistoryTab();
     }
@@ -396,7 +484,6 @@ urlBar.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') {
         let input = urlBar.value;
         let validUrl = processUrl(input);
-        
         const activeWebview = getActiveWebview();
         if (activeWebview) {
             activeWebview.loadURL(validUrl);

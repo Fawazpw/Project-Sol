@@ -1,4 +1,4 @@
-// main.js - Fixed Incognito & robust handling
+// main.js - Final Version with Incognito Detection
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
@@ -22,12 +22,14 @@ function createMainWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(__dirname, 'assets/Sol Logo.png'),
+        icon: path.join(__dirname, 'assets/Sol Logo .png'),
         show: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
-            webviewTag: true
+            webviewTag: true,
+            // We add a custom argument so the renderer knows this is NOT incognito
+            additionalArguments: ['--is-main-window'] 
         }
     });
 
@@ -42,7 +44,6 @@ function createMainWindow() {
     });
 }
 
-// --- Incognito Window Function ---
 function createIncognitoWindow() {
     const incognitoWin = new BrowserWindow({
         width: 1200,
@@ -53,61 +54,48 @@ function createIncognitoWindow() {
             nodeIntegration: true,
             contextIsolation: false,
             webviewTag: true,
-            // This partition string creates a temporary, isolated session
-            partition: 'incognito_view_' + Date.now() 
+            // FIXED: Use a static string so all Incognito windows share cookies!
+            // (No 'persist:' prefix means it clears when the app closes)
+            partition: 'incognito_session' 
         }
     });
 
     incognitoWin.loadFile('index.html');
     incognitoWin.setMenu(null);
-    // Dark background to distinguish
-    incognitoWin.setBackgroundColor('#222'); 
+    incognitoWin.setBackgroundColor('#1a1a1a'); 
 }
 
 app.whenReady().then(() => {
     createSplashWindow();
     createMainWindow();
 
-    // --- Global Keyboard Shortcuts (Inside Webviews) ---
+    // Global Shortcut Handler
     app.on('web-contents-created', (e, contents) => {
         if (contents.getType() === 'webview') {
             contents.on('before-input-event', (event, input) => {
                 if (input.type !== 'keyDown') return;
-
                 const modifier = input.control || input.meta;
                 const isShift = input.shift;
 
                 if (modifier) {
                     switch (input.code) {
-                        // TABS
                         case 'KeyT': 
-                            if (isShift) {
-                                mainWindow.webContents.send('shortcut-restore-tab');
-                            } else {
-                                mainWindow.webContents.send('shortcut-new-tab');
-                            }
+                            if (isShift) contents.getOwnerBrowserWindow().webContents.send('shortcut-restore-tab');
+                            else contents.getOwnerBrowserWindow().webContents.send('shortcut-new-tab');
                             event.preventDefault();
                             break;
-                        
-                        // CLOSE
                         case 'KeyW': 
-                            mainWindow.webContents.send('shortcut-close-tab');
+                            contents.getOwnerBrowserWindow().webContents.send('shortcut-close-tab');
                             event.preventDefault();
                             break;
-                        
-                        // UI
                         case 'KeyS': 
-                            mainWindow.webContents.send('shortcut-toggle-sidebar');
+                            contents.getOwnerBrowserWindow().webContents.send('shortcut-toggle-sidebar');
                             event.preventDefault();
                             break;
-
-                        // HISTORY
                         case 'KeyH':
-                            mainWindow.webContents.send('shortcut-history');
+                            contents.getOwnerBrowserWindow().webContents.send('shortcut-history');
                             event.preventDefault();
                             break;
-
-                        // INCOGNITO
                         case 'KeyN':
                             if (isShift) {
                                 createIncognitoWindow();
@@ -122,18 +110,14 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
+    if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createMainWindow();
-    }
+    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
 });
 
-// IPC Listeners (Commands from Renderer)
+// IPC Listeners
 ipcMain.on('toggle-fullscreen', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
     if (window) window.setFullScreen(!window.isFullScreen());
@@ -148,7 +132,6 @@ ipcMain.on('quit-app', () => {
     app.quit();
 });
 
-// NEW: Listen for incognito request from renderer
 ipcMain.on('new-incognito-window', () => {
     createIncognitoWindow();
 });
