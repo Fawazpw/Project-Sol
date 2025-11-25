@@ -19,6 +19,9 @@
             
             --border-color: #ddd;
             --shadow-color: rgba(26,115,232,0.2);
+
+            /* NEW: Unified Font Stack */
+            --font-main: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
         }
 
         body[data-theme="dark"] {
@@ -37,14 +40,20 @@
             --shadow-color: rgba(74,144,226,0.2);
         }
         
-        /* --- Base Styles --- */
+        /* --- Base Styles & Font Unification --- */
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
             overflow: hidden; 
-            font-family: -apple-system, sans-serif;
+            font-family: var(--font-main); /* Use variable */
             background-color: var(--bg-app);
             color: var(--text-primary);
         }
+
+        /* FORCE all elements to use the same font */
+        button, input, optgroup, select, textarea {
+            font-family: inherit;
+        }
+
         #app-container {
             display: flex; flex-direction: row; height: 100vh;
         }
@@ -102,7 +111,7 @@
             flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            padding: 8px 0;
+            padding: 8px 0; 
         }
 
         /* --- Tab Item Styles --- */
@@ -115,7 +124,7 @@
             background-color: transparent;
             text-align: left; 
             color: var(--text-secondary);
-            animation: tabEnter 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+            font-size: 14px; /* Ensure size consistency */
         }
         .tab-item:hover {
             background-color: var(--bg-hover);
@@ -151,11 +160,12 @@
             display: flex;
             align-items: center;
             padding: 10px 12px;
-            margin: 4px 8px;
+            margin: 4px 19px;
             width: calc(100% - 38px);
             border-radius: 6px;
             background-color: var(--bg-hover);
             cursor: pointer;
+            font-size: 14px; /* Ensure size consistency */
         }
         .folder-toggle {
             margin-right: 8px;
@@ -177,6 +187,7 @@
             margin: -2px -4px;
             border-radius: 3px;
         }
+
         .folder-content {
             padding-top: 4px;
             margin-left: 27px; 
@@ -191,7 +202,7 @@
             padding: 12px;
             border-top: 1px solid var(--border-color);
             background-color: var(--bg-btn-secondary);
-            display: none;
+            display: none; 
         }
         #theme-controls.visible {
             display: block;
@@ -338,6 +349,11 @@
             background-color: var(--bg-hover);
             color: var(--text-accent);
         }
+        .context-menu-separator {
+            height: 1px;
+            background-color: var(--border-color);
+            margin: 4px 0;
+        }
         .context-menu-btn {
             display: none;
         }
@@ -355,27 +371,27 @@
             pointer-events: none;
         }
 
-        /* --- NEW: Spotlight Search Styles --- */
+        /* --- Spotlight Search Styles --- */
         #spotlight-overlay {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.4); /* Dim background */
-            backdrop-filter: blur(5px); /* Glass effect */
+            background-color: rgba(0, 0, 0, 0.4); 
+            backdrop-filter: blur(5px); 
             display: flex;
             justify-content: center;
-            align-items: flex-start; /* Align top-center */
-            padding-top: 15vh; /* Push down from top */
+            align-items: flex-start; 
+            padding-top: 15vh; 
             z-index: 2000;
             opacity: 0;
-            pointer-events: none; /* Click through when hidden */
+            pointer-events: none; 
             transition: opacity 0.2s ease;
         }
         #spotlight-overlay.visible {
             opacity: 1;
-            pointer-events: auto; /* Enable clicking */
+            pointer-events: auto; 
         }
         
         #spotlight-bar {
@@ -400,6 +416,24 @@
             font-size: 20px;
             color: var(--text-primary);
             outline: none;
+        }
+        
+        /* --- Custom Scrollbar --- */
+        #tab-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        #tab-list::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #tab-list::-webkit-scrollbar-thumb {
+            background: transparent;
+            border-radius: 4px;
+        }
+        #tab-list:hover::-webkit-scrollbar-thumb {
+            background: var(--text-secondary);
+        }
+        #tab-list::-webkit-scrollbar-thumb:hover {
+            background: var(--text-accent);
         }
         
     </style>

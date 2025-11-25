@@ -1,4 +1,4 @@
-// renderer.js - Fixed Incognito (Shared Session, Dark Mode, Landing Page)
+// renderer.js - Fixed Incognito Startup Screen
 
 const Sortable = require('sortablejs');
 const { ipcRenderer } = require('electron');
@@ -6,11 +6,9 @@ const { ipcRenderer } = require('electron');
 // --- 1. Detect Incognito Mode & Force Theme ---
 const isIncognito = window.process.argv.includes('--is-incognito');
 
-// FORCE DARK MODE if Incognito
 if (isIncognito) {
     document.body.dataset.theme = 'dark';
     document.title += " (Incognito)";
-    // Disable theme toggle buttons since we are forced dark
     document.addEventListener('DOMContentLoaded', () => {
         const toggleBtn = document.getElementById('dark-mode-toggle-btn');
         if (toggleBtn) {
@@ -74,7 +72,7 @@ function getActiveWebview() {
 
 function processUrl(input) {
     if (input === 'sol://history') return input; 
-    if (input === 'sol://incognito') return input; // Internal ID for incognito page
+    if (input === 'sol://incognito') return input; 
 
     if (input.includes(' ')) {
         return 'https://www.google.com/search?q=' + encodeURIComponent(input);
@@ -97,7 +95,7 @@ function restoreClosedTab() {
 }
 
 function openHistoryTab() {
-    if (isIncognito) return; // No history in incognito
+    if (isIncognito) return; 
 
     const groups = {};
     const sortedHistory = [...historyLog].reverse();
@@ -238,9 +236,8 @@ function activateTab(tabId) {
     if (typeof webview.getURL === 'function') {
         const currentUrl = webview.getURL();
         if (currentUrl.startsWith('data:')) {
-             // Only show "History" or "Incognito" in URL bar, not the huge data string
              if (currentUrl.includes('<title>History</title>')) urlBar.value = "sol://history";
-             else if (currentUrl.includes('<title>You are Incognito</title>')) urlBar.value = ""; // Empty for incognito home
+             else if (currentUrl.includes('<title>You are Incognito</title>')) urlBar.value = ""; 
              else urlBar.value = "about:blank";
         } else {
              urlBar.value = currentUrl;
@@ -260,7 +257,7 @@ function createNewTab(url) {
     // DEFAULT URL LOGIC
     if (!url) {
         if (isIncognito) {
-            // --- NEW: Custom Incognito Landing Page ---
+            // Custom Incognito Landing Page
             url = `
                 data:text/html,
                 <!DOCTYPE html>
@@ -268,24 +265,20 @@ function createNewTab(url) {
                 <head>
                     <title>You are Incognito</title>
                     <style>
-                        body { background-color: #202124; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-                        .container { text-align: center; max-width: 600px; }
-                        .icon { font-size: 80px; margin-bottom: 20px; opacity: 0.8; }
-                        h1 { font-weight: 400; }
-                        p { color: #9aa0a6; line-height: 1.6; }
-                        .badge { background: #333; padding: 5px 10px; border-radius: 4px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; }
+                        body { background-color: #1a1a1a; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+                        .container { text-align: center; max-width: 600px; padding: 40px; border: 1px solid #333; border-radius: 12px; background: #252525; }
+                        .icon { font-size: 60px; margin-bottom: 20px; }
+                        h1 { font-weight: 300; margin-bottom: 20px; }
+                        p { color: #aaa; line-height: 1.6; margin-bottom: 30px; }
+                        .badge { background: #444; padding: 6px 12px; border-radius: 4px; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; font-weight: bold; color: #fff; }
                     </style>
                 </head>
                 <body>
                     <div class="container">
                         <div class="icon">🕶️</div>
-                        <h1>You’ve gone Incognito</h1>
-                        <p>Sol Browser won’t save the following information:<br>
-                        • Your browsing history<br>
-                        • Cookies and site data<br>
-                        • Information entered in forms</p>
-                        <br>
-                        <span class="badge">Incognito</span>
+                        <h1>Incognito Mode</h1>
+                        <p>You can browse privately. Other people who use this device won’t see your activity. However, downloads and bookmarks will be saved.</p>
+                        <span class="badge">Secure Session</span>
                     </div>
                 </body>
                 </html>
@@ -332,7 +325,6 @@ function createNewTab(url) {
             if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
                 const currentUrl = webview.getURL();
                 if (currentUrl.startsWith('data:')) {
-                    // Clean UI for data pages
                     if (currentUrl.includes('<title>History</title>')) {
                         urlBar.value = "sol://history";
                         titleSpan.textContent = "History";
@@ -345,7 +337,6 @@ function createNewTab(url) {
                     let cleanTitle = webview.getTitle().replace(' - Google Search', '');
                     titleSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
                 }
-                
                 backBtn.disabled = !webview.canGoBack();
                 forwardBtn.disabled = !webview.canGoForward();
                 reloadBtn.innerHTML = '&#x21bb;';
@@ -374,7 +365,6 @@ function createNewTab(url) {
     }, 50);
 }
 
-// ... (createNewFolder, stopEditingFolderTitle, handleRenameKeys, toggleSpotlight remain same) ...
 function createNewFolder(parentElement) {
     const folderId = "folder-" + Date.now();
     const folderItem = document.createElement('div');
@@ -448,7 +438,6 @@ ipcRenderer.on('shortcut-toggle-sidebar', () => {
 ipcRenderer.on('shortcut-restore-tab', () => restoreClosedTab());
 ipcRenderer.on('shortcut-history', () => openHistoryTab());
 
-// Global Key Listeners
 window.addEventListener('keydown', (event) => {
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 't') { 
         event.preventDefault();
@@ -538,8 +527,14 @@ function initSortable() {
     });
 }
 
+// --- 4. Initialization ---
 initResizer();
 initSortable();
+
+// NEW: If this is an Incognito window, start with the landing page immediately
+if (isIncognito) {
+    createNewTab(); 
+}
 
 colorPicker.addEventListener('input', (e) => document.body.style.setProperty('--bg-sidebar', e.target.value));
 resetColorBtn.addEventListener('click', () => {

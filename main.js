@@ -22,7 +22,7 @@ function createMainWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(__dirname, 'assets/Sol Logo .png'),
+        icon: path.join(__dirname, 'assets/Sol Logo.png'),
         show: false,
         webPreferences: {
             nodeIntegration: true,
@@ -48,7 +48,7 @@ function createIncognitoWindow() {
     const incognitoWin = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(__dirname, 'assets/icon.png'),
+        icon: path.join(__dirname, 'assets/Sol Logo.png'),
         title: "Sol Browser (Incognito)",
         webPreferences: {
             nodeIntegration: true,
