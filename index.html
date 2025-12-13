@@ -390,6 +390,14 @@
             display: flex;
             flex-direction: column;
             background-color: var(--bg-main);
+            /* Watermark */
+            background-image: url('./assets/Sol Logo.svg');
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: 200px;
+            /* Optional: Add opacity to the image itself if needed, but background-image doesn't support opacity directly.
+               If it's too strong, we might need a pseudo-element or an SVG edit. 
+               For now, assuming standard render is fine as it's a "watermark" on empty space. */
         }
 
         .webview-item {
