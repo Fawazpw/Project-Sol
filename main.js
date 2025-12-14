@@ -22,14 +22,14 @@ function createMainWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(__dirname, 'assets/Sol Logo.png'),
+        icon: path.join(__dirname, 'assets/Sol Logo_homepg.png'),
         show: false,
         webPreferences: {
             nodeIntegration: true,
             contextIsolation: false,
             webviewTag: true,
             // We add a custom argument so the renderer knows this is NOT incognito
-            additionalArguments: ['--is-main-window'] 
+            additionalArguments: ['--is-main-window']
         }
     });
 
@@ -56,13 +56,13 @@ function createIncognitoWindow() {
             webviewTag: true,
             // FIXED: Use a static string so all Incognito windows share cookies!
             // (No 'persist:' prefix means it clears when the app closes)
-            partition: 'incognito_session' 
+            partition: 'incognito_session'
         }
     });
 
     incognitoWin.loadFile('index.html');
     incognitoWin.setMenu(null);
-    incognitoWin.setBackgroundColor('#1a1a1a'); 
+    incognitoWin.setBackgroundColor('#1a1a1a');
 }
 
 app.whenReady().then(() => {
@@ -79,16 +79,16 @@ app.whenReady().then(() => {
 
                 if (modifier) {
                     switch (input.code) {
-                        case 'KeyT': 
+                        case 'KeyT':
                             if (isShift) contents.getOwnerBrowserWindow().webContents.send('shortcut-restore-tab');
                             else contents.getOwnerBrowserWindow().webContents.send('shortcut-new-tab');
                             event.preventDefault();
                             break;
-                        case 'KeyW': 
+                        case 'KeyW':
                             contents.getOwnerBrowserWindow().webContents.send('shortcut-close-tab');
                             event.preventDefault();
                             break;
-                        case 'KeyS': 
+                        case 'KeyS':
                             contents.getOwnerBrowserWindow().webContents.send('shortcut-toggle-sidebar');
                             event.preventDefault();
                             break;
