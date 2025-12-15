@@ -22,7 +22,7 @@ function createMainWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
         height: 800,
-        icon: path.join(__dirname, 'assets/Sol Logo_homepg.png'),
+        icon: path.join(__dirname, 'assets/Sol Logo.png'),
         show: false,
         webPreferences: {
             nodeIntegration: true,
