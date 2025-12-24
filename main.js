@@ -1,7 +1,14 @@
 // main.js - Final Version with Incognito Detection
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
+const { ElectronBlocker } = require('@cliqz/adblocker-electron');
+const fetch = require('cross-fetch');
+
+// Enable AdBlocker
+ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+    blocker.enableBlockingInSession(session.defaultSession);
+});
 
 let mainWindow;
 let splashWindow;
@@ -58,6 +65,12 @@ function createIncognitoWindow() {
             // (No 'persist:' prefix means it clears when the app closes)
             partition: 'incognito_session'
         }
+    });
+
+    // Enable AdBlocker for Incognito Session
+    ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+        const incognitoSession = session.fromPartition('incognito_session');
+        blocker.enableBlockingInSession(incognitoSession);
     });
 
     incognitoWin.loadFile('index.html');
@@ -134,4 +147,59 @@ ipcMain.on('quit-app', () => {
 
 ipcMain.on('new-incognito-window', () => {
     createIncognitoWindow();
+});
+
+// Downloads Handler
+ipcMain.on('clear-data', (event) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    if (win) {
+        win.webContents.session.clearCache();
+        win.webContents.session.clearStorageData();
+        // Respond?
+    }
+});
+
+app.on('session-created', (session) => {
+    session.on('will-download', (event, item, webContents) => {
+        // We can send progress to the window that initiated the download
+        // But getting the browser window from webContents might be the webview's owner?
+        // Standard session: shared. Invoking window...
+
+        const win = BrowserWindow.fromWebContents(webContents);
+        // Note: webContents in will-download might be the webview's contents.
+        // We need to send ipc to the renderer (which is the parent of webview).
+        // Since we are in a single window app (mostly), we can find the owner.
+        // Actually, for webview, we might need to send to all windows or find the specific one.
+
+        // Let's assume the main window or incognito window that owns it.
+        // Unfortunately, finding the embedder is tricky without context.
+        // Simpler approach: Send to all windows, renderer filters?
+
+        item.on('updated', (event, state) => {
+            if (state === 'interrupted') {
+                // handle?
+            } else if (state === 'progressing') {
+                if (item.isPaused()) {
+                    // paused
+                } else {
+                    const percent = item.getReceivedBytes() / item.getTotalBytes();
+                    BrowserWindow.getAllWindows().forEach(w => {
+                        w.webContents.send('download-progress', {
+                            filename: item.getFilename(),
+                            percent: percent,
+                            state: 'progressing'
+                        });
+                    });
+                }
+            }
+        });
+        item.once('done', (event, state) => {
+            BrowserWindow.getAllWindows().forEach(w => {
+                w.webContents.send('download-complete', {
+                    filename: item.getFilename(),
+                    state: state
+                });
+            });
+        });
+    });
 });

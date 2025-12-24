@@ -550,6 +550,55 @@
         #tab-list::-webkit-scrollbar-thumb:hover {
             background: var(--text-accent);
         }
+
+        #bookmark-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+            padding: 0 4px;
+        }
+
+        #bookmark-btn:hover {
+            color: var(--text-accent);
+        }
+
+        #bookmark-btn.active {
+            color: #f7b731;
+            /* Gold color for active bookmark */
+            content: "★";
+        }
+
+        .download-item {
+            background: var(--bg-hover);
+            padding: 8px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            font-size: 12px;
+            overflow: hidden;
+        }
+
+        .download-title {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+
+        .progress-bar {
+            height: 4px;
+            width: 100%;
+            background: #ccc;
+            border-radius: 2px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--text-accent);
+            width: 0%;
+            transition: width 0.2s;
+        }
     </style>
 </head>
 
@@ -558,7 +607,10 @@
 
         <div id="sidebar">
             <div id="sidebar-controls">
-                <input type="text" id="url-bar" placeholder="https://">
+                <div style="display: flex; gap: 5px; width: 100%; align-items: center; margin-bottom: 10px;">
+                    <input type="text" id="url-bar" placeholder="https://">
+                    <button id="bookmark-btn" title="Bookmark this page">☆</button>
+                </div>
                 <div id="nav-buttons">
                     <button id="back-btn" disabled>&larr;</button>
                     <button id="forward-btn" disabled>&rarr;</button>
@@ -583,6 +635,7 @@
             </div>
 
             <div id="sidebar-footer">
+                <div id="downloads-area"></div>
                 <button id="settings-btn" title="Settings">
                     <img src="./assets/settings.svg" alt="Settings">
                 </button>
