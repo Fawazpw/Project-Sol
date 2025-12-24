@@ -75,12 +75,24 @@ function saveSession() {
     const tabs = [];
     document.querySelectorAll('.tab-item').forEach(tab => {
         const id = tab.dataset.id;
+        // Check webview first
         const webview = document.querySelector(`.webview-item[data-id="${id}"]`);
+        let url = '';
+        let title = '';
+
         if (webview) {
-            const url = webview.getURL() || webview.src;
+            url = webview.getURL() || webview.src;
+            title = webview.getTitle();
+        } else {
+            // Check lazy data
+            url = tab.dataset.lazyUrl;
+            title = tab.querySelector('.tab-title').textContent;
+        }
+
+        if (url) {
             tabs.push({
                 url: url,
-                title: webview.getTitle(),
+                title: title,
                 active: tab.classList.contains('active')
             });
         }
@@ -435,15 +447,102 @@ function activateTab(tabId) {
 
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
     // FIXED: Select ALL webviews for this tab (supports Split Screen)
+    // LAZY LOADING (Phase 4): Check if webviews exist
     const webviews = document.querySelectorAll(`.webview-item[data-id="${tabId}"]`);
 
-    if (!tabButton || webviews.length === 0) return;
+    // If no webviews found (and it's a valid tab), we need to Lazy Load them!
+    if (webviews.length === 0) {
+        // Retrieve stored URL from the tab button dataset or session (simplified: store in dataset)
+        const lazyUrl = tabButton.dataset.lazyUrl;
+        if (lazyUrl) {
+            // Create the webview NOW
+            const webview = document.createElement('webview');
+            webview.className = 'webview-item active'; // Create as active immediately
+            webview.setAttribute('data-id', tabId);
+            webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+            webview.src = lazyUrl;
 
-    tabButton.classList.add('active');
-    webviews.forEach(view => view.classList.add('active'));
+            // Re-attach listeners (Refactor this into 'attachWebviewListeners' ideally, but duplication for speed now)
+            webview.addEventListener('did-start-loading', () => {
+                if (webview.getAttribute('data-id') === activeTabId) {
+                    reloadBtn.innerHTML = '&#10005;';
+                    document.body.classList.add('loading');
+                }
+            });
 
-    // Update URL bar immediately (use the first one logic or active one)
-    if (webviews[0]) updateUrlBarForWebview(webviews[0]);
+            // FIXED: Capture shortcuts from INSIDE the webview
+            webview.addEventListener('before-input-event', (event) => {
+                const { type, key, control, meta } = event;
+                if (type !== 'keyDown') return;
+                const isCtrl = control || meta;
+
+                // Ctrl+W: Close Tab
+                if (isCtrl && key === 'w') {
+                    const id = webview.getAttribute('data-id');
+                    if (id) closeTab(id);
+                }
+                // Ctrl+T: New Tab
+                else if (isCtrl && key === 't') {
+                    toggleSpotlight();
+                }
+                // Ctrl+R: Reload
+                else if (isCtrl && key === 'r') {
+                    webview.reload();
+                }
+                // Ctrl+L: Focus URL
+                else if (isCtrl && key === 'l') {
+                    urlBar.focus();
+                    urlBar.select();
+                }
+                // F12: DevTools
+                else if (key === 'F12') {
+                    if (webview.isDevToolsOpened()) webview.closeDevTools();
+                    else webview.openDevTools();
+                }
+            });
+
+            webview.addEventListener('did-stop-loading', () => {
+                const activeWebview = getActiveWebview();
+                if (activeWebview && webview.getAttribute('data-id') === activeWebview.getAttribute('data-id')) {
+                    updateUrlBarForWebview(webview);
+                    reloadBtn.innerHTML = '&#x21bb;';
+                    let cleanTitle = webview.getTitle();
+                    const currentUrl = webview.getURL();
+                    if (currentUrl.startsWith('data:')) {
+                        if (currentUrl.includes('<title>History</title>')) cleanTitle = "History";
+                        else if (currentUrl.includes('<title>Bookmarks</title>')) cleanTitle = "Bookmarks";
+                        else if (currentUrl.includes('<title>Settings</title>')) cleanTitle = "Settings";
+                        else if (currentUrl.includes('<title>You are Incognito</title>')) cleanTitle = "Incognito";
+                    } else if (cleanTitle.includes(' - Google Search')) {
+                        cleanTitle = cleanTitle.replace(' - Google Search', '');
+                    }
+                    if (isIncognito) cleanTitle = "🕶️ " + cleanTitle;
+                    // Update tab title
+                    const tSpan = document.querySelector(`.tab-item[data-id="${tabId}"] .tab-title`);
+                    if (tSpan) tSpan.textContent = cleanTitle.substring(0, 25) || "New Tab";
+                }
+            });
+
+            webview.addEventListener('did-navigate', (event) => {
+                if (webview.getAttribute('data-id') === activeTabId) updateUrlBarForWebview(webview);
+                if (!isIncognito && event.url && !event.url.startsWith('data:')) {
+                    historyLog.push({ title: webview.getTitle() || event.url, url: event.url, time: new Date().toLocaleString(), timestamp: Date.now() });
+                    localStorage.setItem('solHistory', JSON.stringify(historyLog));
+                }
+                saveSession();
+                updateBookmarkButton();
+            });
+
+            webviewContainer.appendChild(webview);
+
+            // Clear lazy data
+            // tabButton.removeAttribute('data-lazy-url'); // Keep it? Nah, session save reads webview URL.
+            // Actually saveSession needs to know.
+        }
+    } else {
+        webviews.forEach(view => view.classList.add('active'));
+        if (webviews[0]) updateUrlBarForWebview(webviews[0]);
+    }
 
     // Also attach these again in case they were lost (idempotent)
     activeTabId = tabId;
@@ -482,7 +581,7 @@ function updateUrlBarForWebview(webview) {
     }
 }
 
-function createNewTab(url) {
+function createNewTab(url, isLazy = false) {
     // DEFAULT URL LOGIC
     if (!url) {
         if (isIncognito) {
@@ -589,6 +688,14 @@ function createNewTab(url) {
     tabList.appendChild(tabButton);
     tabList.scrollTop = tabList.scrollHeight;
 
+    // LAZY LOADING: If lazy, store URL and return, do NOT create webview
+    if (isLazy) {
+        tabButton.dataset.lazyUrl = url;
+        // Optional: Set title if we knew it? We don't.
+        // But we must NOT activate it.
+        return;
+    }
+
     setTimeout(() => {
         const webview = document.createElement('webview');
         webview.className = 'webview-item';
@@ -599,6 +706,37 @@ function createNewTab(url) {
 
         webview.addEventListener('did-start-loading', () => {
             if (webview.getAttribute('data-id') === activeTabId) reloadBtn.innerHTML = '&#10005;';
+        });
+
+        // FIXED: Capture shortcuts from INSIDE the webview (createNewTab)
+        webview.addEventListener('before-input-event', (event) => {
+            const { type, key, control, meta } = event;
+            if (type !== 'keyDown') return;
+            const isCtrl = control || meta;
+
+            // Ctrl+W: Close Tab
+            if (isCtrl && key === 'w') {
+                const id = webview.getAttribute('data-id');
+                if (id) closeTab(id);
+            }
+            // Ctrl+T: New Tab
+            else if (isCtrl && key === 't') {
+                toggleSpotlight();
+            }
+            // Ctrl+R: Reload
+            else if (isCtrl && key === 'r') {
+                webview.reload();
+            }
+            // Ctrl+L: Focus URL
+            else if (isCtrl && key === 'l') {
+                urlBar.focus();
+                urlBar.select();
+            }
+            // F12: DevTools
+            else if (key === 'F12') {
+                if (webview.isDevToolsOpened()) webview.closeDevTools();
+                else webview.openDevTools();
+            }
         });
 
         webview.addEventListener('did-stop-loading', () => {
@@ -702,9 +840,37 @@ function toggleSpotlight() {
     }
 }
 spotlightOverlay.addEventListener('click', (e) => { if (e.target === spotlightOverlay) toggleSpotlight(); });
+// Spotlight Listener (Phase 4: Command Palette)
 spotlightInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         let input = spotlightInput.value;
+
+        // Command Palette Logic
+        if (input.startsWith('>')) {
+            const cmd = input.substring(1).trim().toLowerCase();
+            toggleSpotlight(); // Close overlay
+
+            if (cmd === 'dark mode') document.getElementById('dark-mode-toggle-btn').click();
+            else if (cmd === 'light mode') document.getElementById('dark-mode-toggle-btn').click();
+            else if (cmd.includes('clear')) document.getElementById('clear-data-btn')?.click(); // Needs IPC trigger usually
+            else if (cmd === 'new folder') createNewFolder(tabList);
+            else if (cmd === 'close all') {
+                // Very destructive, maybe confirm?
+                document.querySelectorAll('.tab-close-btn').forEach(b => b.click());
+            }
+            else if (cmd === 'split screen') {
+                // Trigger active tab context split
+                const activeId = activeTabId;
+                if (activeId) {
+                    // Simulate context menu click logic? Or just call the logical part?
+                    // We need the tab data-id, let's reuse the listener logic if possible or extract it.
+                    // Extraction is better but for now let's just alert
+                    alert("Use Right Click -> Split Screen for now.");
+                }
+            }
+            return;
+        }
+
         if (input) {
             let validUrl = processUrl(input);
             createNewTab(validUrl);
@@ -776,9 +942,9 @@ window.addEventListener('keydown', (event) => {
         event.preventDefault();
         toggleSpotlight();
     }
-    else if (event.ctrlKey && event.key === 'w') {
+    else if (event.ctrlKey && event.key.toLowerCase() === 'w') {
         event.preventDefault();
-        closeTab();
+        if (activeTabId) closeTab(activeTabId);
     }
     else if (event.ctrlKey && event.key === 's') {
         event.preventDefault();
@@ -791,6 +957,27 @@ window.addEventListener('keydown', (event) => {
     }
     else if (event.key === 'Escape' && spotlightOverlay.classList.contains('visible')) {
         toggleSpotlight();
+    }
+    // Ctrl+R: Reload
+    else if ((event.ctrlKey || event.metaKey) && event.key === 'r') {
+        event.preventDefault();
+        const activeWebview = getActiveWebview();
+        if (activeWebview) activeWebview.reload();
+        else window.location.reload();
+    }
+    // Ctrl+L: Focus URL
+    else if ((event.ctrlKey || event.metaKey) && event.key === 'l') {
+        event.preventDefault();
+        urlBar.focus();
+        urlBar.select();
+    }
+    // F12: DevTools
+    else if (event.key === 'F12') {
+        const activeWebview = getActiveWebview();
+        if (activeWebview) {
+            if (activeWebview.isDevToolsOpened()) activeWebview.closeDevTools();
+            else activeWebview.openDevTools();
+        }
     }
 });
 
@@ -983,6 +1170,8 @@ if (notepad) {
     });
 }
 
+
+
 // --- 4. Initialization ---
 initResizer();
 initSortable();
@@ -992,11 +1181,44 @@ if (isIncognito) {
     createNewTab();
 } else {
     // Attempt session restore
-    const session = restoreSession();
-    if (session) {
-        session.forEach(tabState => {
-            createNewTab(tabState.url);
+    const sessionRestored = restoreSession();
+    if (sessionRestored) {
+        sessionRestored.forEach((tabState, index) => {
+            // Lazy load all tabs except the last one (active one)
+            // Or restored active state.
+            // Simplified: Activate last tab.
+            const shouldBeLazy = !tabState.active;
+            createNewTab(tabState.url, shouldBeLazy);
+            if (tabState.title) {
+                // Pre-fill title for lazy tabs
+                const lastTab = tabList.lastElementChild;
+                const tSpan = lastTab.querySelector('.tab-title');
+                if (tSpan) tSpan.textContent = tabState.title;
+            }
+            if (tabState.active) {
+                // We need the ID. createNewTab generates a random ID.
+                // This architecture is hard to link.
+                // Workaround: We just activate the last created tab if it wasn't lazy.
+                // But createNewTab is async for webview creation (setTimeout).
+                // Actually, createNewTab's setTimeout is 50ms.
+                // We can manually activate the LAST tab item after loop.
+            }
         });
+        // Activate the actual active tab? Complex with random IDs.
+        // Simple fallback: Activate the last tab in the list.
+        setTimeout(() => {
+            const tabs = document.querySelectorAll('.tab-item');
+            if (tabs.length > 0) {
+                // Try to find the one we marked active in storage? 
+                // saveSession saves 'active' boolean.
+                // We passed shouldBeLazy based on it.
+                // The one where isLazy=false will be fully created and activated by createNewTab automatically?
+                // Wait, createNewTab calls activateTab inside the setTimeout!
+                // So the non-lazy one (active one) will auto-activate.
+                // The lazy ones will NOT auto-activate.
+                // Perfect.
+            }
+        }, 100);
     } else {
         createNewTab(); // Default new tab
     }

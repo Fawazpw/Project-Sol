@@ -2,7 +2,18 @@
 
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const path = require('path');
+
+// Disable Hardware Acceleration to fix GPU errors
+app.disableHardwareAcceleration();
+// app.commandLine.appendSwitch('disable-software-rasterizer'); // Caused fatal failure
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-rasterization');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('--no-sandbox');
+
 const { ElectronBlocker } = require('@cliqz/adblocker-electron');
+const { ElectronChromeExtensions } = require('electron-chrome-extensions');
 const fetch = require('cross-fetch');
 
 // Enable AdBlocker
@@ -78,7 +89,17 @@ function createIncognitoWindow() {
     incognitoWin.setBackgroundColor('#1a1a1a');
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+    // Phase 4: Extensions
+    try {
+        const extensions = new ElectronChromeExtensions({
+            license: 'GPL-3.0', // Valid license for the library
+        });
+        // await extensions.loadExtension('/path/to/extension/unpacked'); // Manual loading if needed
+    } catch (err) {
+        console.error("Failed to initialize Chrome Extensions:", err);
+    }
+
     createSplashWindow();
     createMainWindow();
 
