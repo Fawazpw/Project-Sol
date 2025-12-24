@@ -6,9 +6,9 @@ const { ElectronBlocker } = require('@cliqz/adblocker-electron');
 const fetch = require('cross-fetch');
 
 // Enable AdBlocker
-ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
-    blocker.enableBlockingInSession(session.defaultSession);
-});
+// ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+//    blocker.enableBlockingInSession(session.defaultSession);
+// });
 
 let mainWindow;
 let splashWindow;
@@ -68,10 +68,10 @@ function createIncognitoWindow() {
     });
 
     // Enable AdBlocker for Incognito Session
-    ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
-        const incognitoSession = session.fromPartition('incognito_session');
-        blocker.enableBlockingInSession(incognitoSession);
-    });
+    // ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+    //    const incognitoSession = session.fromPartition('incognito_session');
+    //    blocker.enableBlockingInSession(incognitoSession);
+    // });
 
     incognitoWin.loadFile('index.html');
     incognitoWin.setMenu(null);

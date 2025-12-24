@@ -388,7 +388,7 @@
         #webview-container {
             flex: 1;
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
             background-color: var(--bg-main);
             background-image: url('./assets/Sol Logo_homepg.svg');
             background-repeat: no-repeat;
@@ -599,6 +599,91 @@
             width: 0%;
             transition: width 0.2s;
         }
+
+        /* --- Widget Styles --- */
+        #widgets-container {
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-btn-secondary);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .widget-header {
+            padding: 8px 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .widget-header:hover {
+            background: var(--bg-hover);
+        }
+
+        .widget-content {
+            padding: 8px;
+            display: none;
+        }
+
+        .widget-content.expanded {
+            display: block;
+        }
+
+        #notepad-area {
+            width: 100%;
+            height: 100px;
+            resize: vertical;
+            background: var(--bg-main);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: 13px;
+            padding: 5px;
+            box-sizing: border-box;
+        }
+
+        .calc-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4px;
+        }
+
+        .calc-btn {
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 8px 0;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .calc-btn:hover {
+            background: var(--bg-hover);
+        }
+
+        .calc-btn.accent {
+            background: var(--text-accent);
+            color: white;
+            border: none;
+        }
+
+        #calc-display {
+            width: 100%;
+            margin-bottom: 5px;
+            padding: 5px;
+            text-align: right;
+            background: var(--bg-main);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: 4px;
+        }
     </style>
 </head>
 
@@ -610,6 +695,9 @@
                 <div style="display: flex; gap: 5px; width: 100%; align-items: center; margin-bottom: 10px;">
                     <input type="text" id="url-bar" placeholder="https://">
                     <button id="bookmark-btn" title="Bookmark this page">☆</button>
+                    <!-- Reader Mode Toggle -->
+                    <button id="reader-mode-btn" title="Reader Mode"
+                        style="display:none; font-size:14px; padding:0 5px;">📖</button>
                 </div>
                 <div id="nav-buttons">
                     <button id="back-btn" disabled>&larr;</button>
@@ -619,6 +707,46 @@
             </div>
 
             <div id="tab-list"></div>
+
+            <div id="widgets-container">
+                <!-- Notepad Widget -->
+                <div class="widget-header" onclick="toggleWidget('notepad')">
+                    Notepad <span id="notepad-toggle">▼</span>
+                </div>
+                <div id="notepad-widget" class="widget-content">
+                    <textarea id="notepad-area" placeholder="Type notes here..."></textarea>
+                </div>
+
+                <!-- Calculator Widget -->
+                <div class="widget-header" onclick="toggleWidget('calc')">
+                    Calculator <span id="calc-toggle">▼</span>
+                </div>
+                <div id="calc-widget" class="widget-content">
+                    <input type="text" id="calc-display" readonly>
+                    <div class="calc-grid">
+                        <button class="calc-btn" onclick="calcInput('7')">7</button>
+                        <button class="calc-btn" onclick="calcInput('8')">8</button>
+                        <button class="calc-btn" onclick="calcInput('9')">9</button>
+                        <button class="calc-btn" onclick="calcInput('/')">/</button>
+
+                        <button class="calc-btn" onclick="calcInput('4')">4</button>
+                        <button class="calc-btn" onclick="calcInput('5')">5</button>
+                        <button class="calc-btn" onclick="calcInput('6')">6</button>
+                        <button class="calc-btn" onclick="calcInput('*')">*</button>
+
+                        <button class="calc-btn" onclick="calcInput('1')">1</button>
+                        <button class="calc-btn" onclick="calcInput('2')">2</button>
+                        <button class="calc-btn" onclick="calcInput('3')">3</button>
+                        <button class="calc-btn" onclick="calcInput('-')">-</button>
+
+                        <button class="calc-btn" onclick="calcInput('0')">0</button>
+                        <button class="calc-btn" onclick="calcInput('.')">.</button>
+                        <button class="calc-btn" onclick="calcClear()">C</button>
+                        <button class="calc-btn accent" onclick="calcEval()">=</button>
+                        <button class="calc-btn" onclick="calcInput('+')" style="grid-column: span 4;">+</button>
+                    </div>
+                </div>
+            </div>
 
             <div id="theme-controls">
                 <div id="color-picker-wrapper">
@@ -648,6 +776,8 @@
     </div>
 
     <div id="context-menu">
+        <button id="ctx-split-screen" class="context-menu-btn">Split Screen</button>
+        <div class="context-menu-separator"></div>
         <button id="ctx-add-folder" class="context-menu-btn">New Folder</button>
         <button id="ctx-add-nested-folder" class="context-menu-btn">New Nested Folder</button>
         <button id="ctx-rename-folder" class="context-menu-btn">Rename</button>

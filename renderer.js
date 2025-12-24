@@ -417,7 +417,8 @@ function closeTab(tabId) {
 
     setTimeout(() => {
         tabButton.remove();
-        webview.remove();
+        // FIXED: Remove ALL webviews associated with this tab (Split Screen cleanup)
+        document.querySelectorAll(`.webview-item[data-id="${tabId}"]`).forEach(w => w.remove());
 
         const remainingTabs = document.querySelectorAll('.tab-item');
         if (remainingTabs.length === 0) {
@@ -433,15 +434,16 @@ function activateTab(tabId) {
     document.querySelectorAll('.webview-item.active').forEach(view => view.classList.remove('active'));
 
     const tabButton = document.querySelector(`.tab-item[data-id="${tabId}"]`);
-    const webview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
+    // FIXED: Select ALL webviews for this tab (supports Split Screen)
+    const webviews = document.querySelectorAll(`.webview-item[data-id="${tabId}"]`);
 
-    if (!tabButton || !webview) return;
+    if (!tabButton || webviews.length === 0) return;
 
     tabButton.classList.add('active');
-    webview.classList.add('active');
+    webviews.forEach(view => view.classList.add('active'));
 
-    // Update URL bar immediately
-    updateUrlBarForWebview(webview);
+    // Update URL bar immediately (use the first one logic or active one)
+    if (webviews[0]) updateUrlBarForWebview(webviews[0]);
 
     // Also attach these again in case they were lost (idempotent)
     activeTabId = tabId;
@@ -460,8 +462,14 @@ function updateUrlBarForWebview(webview) {
         else if (currentUrl.includes('<title>Settings</title>')) urlBar.value = "sol://settings";
         else if (currentUrl.includes('<title>You are Incognito</title>')) urlBar.value = "sol://incognito";
         else urlBar.value = ""; // Don't show raw data URIs
+
+        // Hide reader button on internal pages
+        document.getElementById('reader-mode-btn').style.display = 'none';
     } else {
         urlBar.value = currentUrl;
+        // Show reader button for http/https
+        if (currentUrl.startsWith('http')) document.getElementById('reader-mode-btn').style.display = 'block';
+        else document.getElementById('reader-mode-btn').style.display = 'none';
     }
 
     updateBookmarkButton();
@@ -505,7 +513,48 @@ function createNewTab(url) {
             `;
             url = 'data:text/html;charset=utf-8,' + encodeURIComponent(incognitoHtml);
         } else {
-            url = "https://www.google.com";
+            // STANDARD NEW TAB PAGE (Phase 3)
+            const hour = new Date().getHours();
+            const greetings = ["Good Morning", "Good Afternoon", "Good Evening"];
+            const greeting = greetings[Math.floor(hour / 8)];
+
+            // Get top sites from history (simple frequent list or hardcoded for now)
+            const newTabHtml = `
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>New Tab</title>
+                    <style>
+                        body { background-color: #121212; color: #fff; font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-size: cover; background-position: center; transition: background 0.5s; }
+                        h1 { font-size: 48px; font-weight: 200; margin-bottom: 10px; text-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+                        .search-box { background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); padding: 15px 25px; border-radius: 30px; width: 500px; display: flex; align-items: center; border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+                        .search-box input { background: transparent; border: none; flex: 1; color: white; font-size: 18px; outline: none; margin-left: 10px; }
+                        .shortcuts { display: flex; gap: 20px; margin-top: 50px; }
+                        .shortcut { display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.2s; text-decoration: none; color: white; }
+                        .shortcut:hover { transform: translateY(-5px); }
+                        .shortcut-icon { width: 60px; height: 60px; background: rgba(255,255,255,0.1); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-bottom: 10px; backdrop-filter: blur(5px); }
+                    </style>
+                </head>
+                <body>
+                    <h1>${greeting}</h1>
+                    <div class="search-box">
+                        <span>🔍</span>
+                        <input type="text" placeholder="Search the web..." onkeydown="if(event.key==='Enter') window.location.href='https://google.com/search?q='+encodeURIComponent(this.value)">
+                    </div>
+                    <div class="shortcuts">
+                        <a href="https://youtube.com" class="shortcut"><div class="shortcut-icon">▶️</div><span>YouTube</span></a>
+                        <a href="https://github.com" class="shortcut"><div class="shortcut-icon">🐙</div><span>GitHub</span></a>
+                        <a href="https://twitter.com" class="shortcut"><div class="shortcut-icon">🐦</div><span>Twitter</span></a>
+                        <a href="https://reddit.com" class="shortcut"><div class="shortcut-icon">🤖</div><span>Reddit</span></a>
+                    </div>
+                    <script>
+                        // Optional: Fetch Unsplash Image
+                        // For now static dark
+                    </script>
+                </body>
+                </html>
+            `;
+            url = 'data:text/html;charset=utf-8,' + encodeURIComponent(newTabHtml);
         }
     } else if (url === "sol://history") {
         openHistoryTab();
@@ -544,6 +593,8 @@ function createNewTab(url) {
         const webview = document.createElement('webview');
         webview.className = 'webview-item';
         webview.setAttribute('data-id', tabId);
+        // FIXED: Set standard User Agent to avoid blocking by X/YouTube/Google
+        webview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
         webview.src = url;
 
         webview.addEventListener('did-start-loading', () => {
@@ -798,6 +849,137 @@ function initSortable() {
         handle: '.tab-item, .folder-item',
         filter: '.folder-content',
         animation: 150,
+    });
+}
+
+// --- 5. Phase 3 Features Logic ---
+
+// Widgets Logic
+window.toggleWidget = (id) => {
+    const content = document.getElementById(id + '-widget');
+    const toggle = document.getElementById(id + '-toggle');
+    // Initialize if null (first run)
+    if (!content.style.display) content.style.display = 'none';
+
+    if (content.style.display === 'block') {
+        content.style.display = 'none';
+        toggle.textContent = '▼';
+    } else {
+        content.style.display = 'block';
+        toggle.textContent = '▲';
+    }
+}
+
+let calcExp = '';
+window.calcInput = (v) => {
+    calcExp += v;
+    document.getElementById('calc-display').value = calcExp;
+}
+window.calcClear = () => {
+    calcExp = '';
+    document.getElementById('calc-display').value = '';
+}
+window.calcEval = () => {
+    try {
+        calcExp = eval(calcExp).toString();
+        document.getElementById('calc-display').value = calcExp;
+    } catch (e) {
+        document.getElementById('calc-display').value = 'Error';
+        calcExp = '';
+    }
+}
+
+// Reader Mode
+const readerBtn = document.getElementById('reader-mode-btn');
+readerBtn.addEventListener('click', () => {
+    const activeWebview = getActiveWebview();
+    if (!activeWebview) return;
+    const currentUrl = activeWebview.getURL();
+    if (currentUrl.startsWith('https://r.jina.ai/')) {
+        // Toggle OFF (Go back to original)
+        activeWebview.goBack(); // Simple assumption
+    } else {
+        // Toggle ON
+        activeWebview.loadURL('https://r.jina.ai/' + currentUrl);
+    }
+});
+
+// Split Screen (Context Menu Handler)
+document.getElementById('ctx-split-screen').addEventListener('click', () => {
+    const tabId = contextMenu.dataset.targetId; // This is set in the contextmenu event
+    if (!tabId) return;
+
+    // Ask user for URL to split with
+    const splitUrl = prompt("Enter URL to split with:", "https://google.com");
+    if (!splitUrl) return;
+
+    // Find the active webview
+    const activeWebview = document.querySelector(`.webview-item[data-id="${tabId}"]`);
+    if (!activeWebview) return;
+
+    contextMenu.style.display = 'none';
+
+    // THIS IS A PHASE 3 MVP SPLIT SCREEN
+    // We will resize the current webview and create a sibling webview
+
+    // 1. Mark current webview as 'split-left'
+    activeWebview.style.width = '50%';
+    activeWebview.style.flex = 'none';
+    activeWebview.style.borderRight = '1px solid #333';
+
+    // 2. Create right webview
+    const splitWebview = document.createElement('webview');
+    splitWebview.className = 'webview-item split-right';
+    // It shares the same DATA-ID so it shows/hides with the tab!
+    splitWebview.setAttribute('data-id', tabId);
+    // FIXED: Set UA for split view too
+    splitWebview.useragent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    splitWebview.src = splitUrl;
+    splitWebview.style.width = '50%';
+    splitWebview.style.flex = 'none';
+    splitWebview.style.display = 'flex'; // Force show as it matches the ID
+
+    // Add to container after the active one
+    activeWebview.parentNode.insertBefore(splitWebview, activeWebview.nextSibling);
+
+    // Note: Tab activation logic naturally toggles 'display' based on data-id.
+    // Since both have same data-id, both will be toggled!
+    // We just need to ensure the CSS .webview-item.active { display: flex } works.
+    // We manually set display:flex on the split one, but class-based toggling is safer.
+    splitWebview.classList.add('active'); // Since tab is active
+
+    // Cleanup on close? closeTab removes by data-id.
+    // If it queries selectAll, it will remove BOTH! Perfect.
+});
+
+// Context Menu for Tabs
+// Need to update the event listener to catch tabs too
+const tabListContainer = document.getElementById('tab-list');
+tabListContainer.addEventListener('contextmenu', (e) => {
+    const clickedTab = e.target.closest('.tab-item');
+    if (clickedTab) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const folderOpts = [ctxAddNestedFolder, ctxRenameFolder, ctxDeleteFolder];
+        folderOpts.forEach(el => el.style.display = 'none');
+        ctxAddFolder.style.display = 'none';
+
+        document.getElementById('ctx-split-screen').style.display = 'block';
+
+        contextMenu.dataset.targetId = clickedTab.dataset.id;
+        contextMenu.style.top = `${e.clientY}px`;
+        contextMenu.style.left = `${e.clientX}px`;
+        contextMenu.style.display = 'block';
+    }
+});
+
+// Init Notepad
+const notepad = document.getElementById('notepad-area');
+if (notepad) {
+    notepad.value = localStorage.getItem('solNotepad') || '';
+    notepad.addEventListener('input', () => {
+        localStorage.setItem('solNotepad', notepad.value);
     });
 }
 
