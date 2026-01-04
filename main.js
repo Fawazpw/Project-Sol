@@ -17,9 +17,16 @@ const { ElectronChromeExtensions } = require('electron-chrome-extensions');
 const fetch = require('cross-fetch');
 
 // Enable AdBlocker
-// ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
-//    blocker.enableBlockingInSession(session.defaultSession);
-// });
+let blockerInstance;
+let isAdBlockEnabled = true;
+
+ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((blocker) => {
+    blockerInstance = blocker;
+    if (isAdBlockEnabled) {
+        blocker.enableBlockingInSession(session.defaultSession);
+        console.log("AdBlocker enabled by default.");
+    }
+});
 
 let mainWindow;
 let splashWindow;
@@ -176,8 +183,27 @@ ipcMain.on('clear-data', (event) => {
     if (win) {
         win.webContents.session.clearCache();
         win.webContents.session.clearStorageData();
-        // Respond?
     }
+});
+
+// Ad-Blocker IPC
+ipcMain.on('get-adblock-state', (event) => {
+    event.sender.send('update-adblock-state', isAdBlockEnabled);
+});
+
+ipcMain.on('toggle-adblock', (event) => {
+    isAdBlockEnabled = !isAdBlockEnabled;
+    if (blockerInstance) {
+        if (isAdBlockEnabled) {
+            blockerInstance.enableBlockingInSession(session.defaultSession);
+        } else {
+            blockerInstance.disableBlockingInSession(session.defaultSession);
+        }
+    }
+    // Send to all windows
+    BrowserWindow.getAllWindows().forEach(win => {
+        win.webContents.send('update-adblock-state', isAdBlockEnabled);
+    });
 });
 
 app.on('session-created', (session) => {

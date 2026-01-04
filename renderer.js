@@ -26,6 +26,7 @@ const backBtn = document.getElementById('back-btn');
 const forwardBtn = document.getElementById('forward-btn');
 const reloadBtn = document.getElementById('reload-btn');
 const tabList = document.getElementById('tab-list');
+const adBlockBtn = document.getElementById('ad-block-btn'); // Ad-Blocker Toggle
 const webviewContainer = document.getElementById('webview-container');
 
 // Theme & Settings
@@ -927,6 +928,27 @@ ipcRenderer.on('download-complete', (event, { filename, state }) => {
 const bookmarkBtn = document.getElementById('bookmark-btn');
 if (bookmarkBtn) {
     bookmarkBtn.addEventListener('click', toggleBookmark);
+}
+
+// Ad-Blocker Toggle Listener
+if (adBlockBtn) {
+    adBlockBtn.addEventListener('click', () => {
+        ipcRenderer.send('toggle-adblock');
+    });
+
+    // Receive state updates
+    ipcRenderer.on('update-adblock-state', (event, isEnabled) => {
+        if (isEnabled) {
+            adBlockBtn.style.color = '#4caf50'; // Green
+            adBlockBtn.style.filter = 'drop-shadow(0 0 2px #4caf50)';
+        } else {
+            adBlockBtn.style.color = '#f44336'; // Red
+            adBlockBtn.style.filter = 'none';
+        }
+    });
+
+    // Request initial state
+    ipcRenderer.send('get-adblock-state');
 }
 
 window.addEventListener('keydown', (event) => {
