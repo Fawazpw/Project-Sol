@@ -6,18 +6,18 @@ Project Sol is designed to provide a clean, distraction-free browsing experience
 
 ![License](https://img.shields.io/badge/license-ISC-blue.svg) ![Electron](https://img.shields.io/badge/built%20with-Electron-orange.svg)
 
-## ✨ Key Features
+##  Key Features
 
-### 🛡️ Privacy First
+###  Privacy First
 - **Incognito Mode**: Browse securely without saving history or cookies (`Ctrl + Shift + N`).
 - **Built-in Ad-Blocker**: Integrated ad-blocking capabilities to keep your browsing clean and fast.
 
-### 🎨 Modern & Customizable UI
+###  Modern & Customizable UI
 - **Sidebar Navigation**: Vertical tab management with folder support for better organization.
 - **Theming**: Toggle between Dark and Light modes, or pick a custom accent color for your sidebar.
 - **Minimalist Aesthetics**: A clean, unified interface using modern font stacks (Inter, Roboto, San Francisco).
 
-### 🚀 Productivity Tools
+###  Productivity Tools
 - **Split Screen (MVP)**: View two pages side-by-side within the same tab for multitasking (Right-click tab -> Split Screen).
 - **Workspace Organization**: Create folders and nested folders to group related tabs.
 - **Spotlight Search**: A powerful command palette to search tabs, history, and run browser commands (`Ctrl + T`).
@@ -26,7 +26,7 @@ Project Sol is designed to provide a clean, distraction-free browsing experience
 
 ---
 
-## 🛠️ Installation & Development
+##  Installation & Development
 
 To build and run Project Sol locally, ensure you have [Node.js](https://nodejs.org/) installed.
 
@@ -48,7 +48,7 @@ To build and run Project Sol locally, ensure you have [Node.js](https://nodejs.o
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+##  Keyboard Shortcuts
 
 Maximize your efficiency with these global shortcuts:
 
@@ -66,7 +66,7 @@ Maximize your efficiency with these global shortcuts:
 
 ---
 
-## 📂 Project Structure
+##  Project Structure
 
 - **`main.js`**: The main process entry point. Handles window creation, lifecycle events, and global shortcuts.
 - **`renderer.js`**: The renderer process logic. Manages the DOM, tab system, webview handling, and UI interactions.
@@ -76,7 +76,7 @@ Maximize your efficiency with these global shortcuts:
 
 ---
 
-## 🗺️ Roadmap
+##  Roadmap
 
 - [x] Basic Tab & Window Management
 - [x] History & Bookmarks System
@@ -87,7 +87,7 @@ Maximize your efficiency with these global shortcuts:
 
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome! Feel free to submit a Pull Request.
 
@@ -99,4 +99,4 @@ Contributions are welcome! Feel free to submit a Pull Request.
 
 ---
 
-*Made with ❤️ by Fawazpw*
+*Made by Fawazpw*
